@@ -1,5 +1,5 @@
 <?php
-namespace Joshdifabio\ChildProcess;
+namespace Joshdifabio\FutureProcess;
 
 use Symfony\Component\Process\PhpExecutableFinder;
 
@@ -20,7 +20,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testPHPHelloWorld()
     {
-        $options = $this->getMockForAbstractClass('Joshdifabio\\ChildProcess\\ProcessOptionsInterface');
+        $options = $this->getMockForAbstractClass('Joshdifabio\\FutureProcess\\ProcessOptionsInterface');
         
         $options->expects($this->atLeastOnce())
                 ->method('getWorkingDirectory')
@@ -45,7 +45,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testExecuteCommandWithTimeout()
     {
-        $options = $this->getMockForAbstractClass('Joshdifabio\\ChildProcess\\ProcessOptionsInterface');
+        $options = $this->getMockForAbstractClass('Joshdifabio\\FutureProcess\\ProcessOptionsInterface');
         
         $options->expects($this->atLeastOnce())
                 ->method('getWorkingDirectory')

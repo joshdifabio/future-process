@@ -1,5 +1,5 @@
 <?php
-namespace Joshdifabio\ChildProcess;
+namespace Joshdifabio\FutureProcess;
 
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>

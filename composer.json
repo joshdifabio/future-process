@@ -1,5 +1,5 @@
 {
-    "name": "joshdifabio/child-process",
+    "name": "joshdifabio/future-process",
     "license": "MIT",
     "authors": [
         {
@@ -18,12 +18,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Joshdifabio\\ChildProcess\\": "src"
+            "Joshdifabio\\FutureProcess\\": "src"
        }
     },
     "autoload-dev": {
         "psr-4": {
-            "Joshdifabio\\ChildProcess\\": "tests"
+            "Joshdifabio\\FutureProcess\\": "tests"
         }
     }
 }

@@ -1,5 +1,5 @@
 <?php
-namespace Joshdifabio\ChildProcess;
+namespace Joshdifabio\FutureProcess;
 
 class TimeoutException extends \RuntimeException
 {

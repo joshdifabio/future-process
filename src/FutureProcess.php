@@ -1,5 +1,5 @@
 <?php
-namespace Joshdifabio\ChildProcess;
+namespace Joshdifabio\FutureProcess;
 
 use React\Promise\FulfilledPromise;
 
