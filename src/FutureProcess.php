@@ -140,9 +140,7 @@ class FutureProcess
     
     private function copyOptions(ProcessOptionsInterface $options)
     {
-        $copy = new ProcessOptions;
-        
-        $copy->setCommandLine($options->getCommandLine());
+        $copy = new ProcessOptions($options->getCommandLine());
         $copy->setWorkingDirectory($options->getWorkingDirectory());
         $copy->setEnvironment($options->getEnvironment());
         

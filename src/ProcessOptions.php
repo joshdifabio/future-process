@@ -10,6 +10,11 @@ class ProcessOptions implements ProcessOptionsInterface
     private $workingDirectory;
     private $environment;
     
+    public function __construct($commandLine = null)
+    {
+        $this->commandLine = $commandLine;
+    }
+    
     public function getCommandLine()
     {
         return $this->commandLine;
