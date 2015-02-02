@@ -53,14 +53,12 @@ class Shell
     
     public function run($stopAutomatically = true, $timeout = null)
     {
-        if ($timeout) {
-            $absoluteTimeout = microtime(true) + $timeout;
-        }
+        $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
         
         while (!$stopAutomatically || $this->activeProcesses->count() || $this->queue->count()) {
             $this->refreshAllProcesses();
             
-            if ($timeout && microtime(true) >= $absoluteTimeout) {
+            if ($absoluteTimeout && microtime(true) >= $absoluteTimeout) {
                 throw new TimeoutException;
             }
             
@@ -81,26 +79,26 @@ class Shell
     
     private function initClosures()
     {
-        $this->handleQueueFn = function () {
-            while ($this->queue->count() && $this->canStartProcess()) {
-                $this->queue->dequeue()->resolve();
+        $queue = $this->queue;
+        $this->handleQueueFn = function () use ($queue) {
+            while ($queue->count() && $this->canStartProcess()) {
+                $queue->dequeue()->resolve();
             }
         };
         
-        $this->runUntilFutureRealisedFn = function (FutureValue $futureValue, $timeout = null) {
-            if ($timeout) {
-                $absoluteTimeout = microtime(true) + $timeout;
-            }
+        $activeProcesses = $this->activeProcesses;
+        $this->runUntilFutureRealisedFn = function ($futureValue, $timeout) use ($activeProcesses) {
+            $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
 
             while (!$futureValue->isRealised()) {
-                foreach ($this->activeProcesses as $process) {
+                foreach ($activeProcesses as $process) {
                     $process->getStatus(true);
                     if ($futureValue->isRealised()) {
                         return;
                     }
                 }
 
-                if ($timeout && microtime(true) >= $absoluteTimeout) {
+                if ($absoluteTimeout && microtime(true) >= $absoluteTimeout) {
                     throw new TimeoutException;
                 }
 
