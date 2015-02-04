@@ -20,25 +20,22 @@ class FutureProcess
     private $result;
     
     public function __construct(
-        ProcessOptionsInterface $options,
+        array $options,
         FutureValue $futureExitCode,
         FutureValue $queueSlot = null
     ) {
         $this->futureExitCode = $futureExitCode;
+        $startFn = $this->getStartFn();
         
         if ($this->queueSlot = $queueSlot) {
             $this->status = self::STATUS_QUEUED;
-            
-            $startFn = array($this, 'start');
-            $options = $this->copyOptions($options);
             $that = $this;
-            
             $this->promise = $queueSlot->then(function () use ($startFn, $options, $that) {
                 $startFn($options);
                 return $that;
             });
         } else {
-            $this->start($options);
+            $startFn($options);
             $this->promise = new FulfilledPromise($this);
         }
     }
@@ -115,35 +112,30 @@ class FutureProcess
         return $this->promise->then($onFulfilled, $onError, $onProgress);
     }
     
-    private function start(ProcessOptionsInterface $options)
+    private function getStartFn()
     {
-        $this->resource = proc_open(
-            $options->getCommandLine(),
-            array(
-                0 => array('pipe', 'r'),
-                1 => array('pipe', 'w'),
-                2 => array('pipe', 'w'),
-            ),
-            $this->streams,
-            $options->getWorkingDirectory(),
-            $options->getEnvironment()->toArray()
-        );
+        $resource = &$this->resource;
+        $streams = &$this->streams;
+        $status = &$this->status;
         
-        $this->status = self::STATUS_RUNNING;
+        return function (array $options) use (&$resource, &$streams, &$status) {
+            if (!isset($options[1])) {
+                $options[1] = array(
+                    0 => array('pipe', 'r'),
+                    1 => array('pipe', 'w'),
+                    2 => array('pipe', 'w'),
+                );
+            }
+            
+            array_splice($options, 2, 0, array(&$streams));
+            $resource = call_user_func_array('proc_open', $options);
+            $status = self::STATUS_RUNNING;
+        };
     }
     
     private function doExit($status, $exitCode = null)
     {
         $this->status = $status;
         $this->futureExitCode->resolve($exitCode);
-    }
-    
-    private function copyOptions(ProcessOptionsInterface $options)
-    {
-        $copy = new ProcessOptions($options->getCommandLine());
-        $copy->setWorkingDirectory($options->getWorkingDirectory());
-        $copy->setEnvironment($options->getEnvironment());
-        
-        return $copy;
     }
 }

@@ -6,6 +6,7 @@ class Shell
     private $processLimit = 10;
     private $activeProcesses;
     private $queue;
+    private $canStartProcessFn;
     private $handleQueueFn;
     private $runUntilFutureRealisedFn;
     
@@ -13,30 +14,33 @@ class Shell
     {
         $this->activeProcesses = new \SplObjectStorage;
         $this->queue = new \SplQueue;
-        $this->initClosures();
+        $this->canStartProcessFn = $this->createCanStartProcessFn();
+        $this->handleQueueFn = $this->createHandleQueueFn();
+        $this->runUntilFutureRealisedFn = $this->createRunUntilFutureRealisedFn();
     }
     
-    public function startProcess(ProcessOptionsInterface $options)
-    {
+    public function startProcess(
+        $command,
+        array $descriptorSpec = null,
+        $workingDirectory = null,
+        array $environmentVariables = null,
+        array $otherOptions = null
+    ) {
         $handleQueueFn = $this->handleQueueFn;
-        $runUntilFutureRealisedFn = $this->runUntilFutureRealisedFn;
-        
         $handleQueueFn();
+        
+        $process = $this->createProcess(array(
+            $command,
+            $descriptorSpec,
+            $workingDirectory,
+            $environmentVariables,
+            $otherOptions
+        ));
+
         $activeProcesses = $this->activeProcesses;
-        $futureExitCode = new FutureValue($runUntilFutureRealisedFn);
-        
-        if ($activeProcesses->count() >= $this->processLimit) {
-            $queueSlot = new FutureValue($runUntilFutureRealisedFn);
-            $process = new FutureProcess($options, $futureExitCode, $queueSlot);
-            $this->queue->enqueue($queueSlot);
-        } else {
-            $process = new FutureProcess($options, $futureExitCode);
-        }
-        
         $process->then(function () use ($activeProcesses, $process) {
             $activeProcesses->attach($process);
         });
-        
         $onComplete = function () use ($activeProcesses, $process, $handleQueueFn) {
             $activeProcesses->detach($process);
             $handleQueueFn();
@@ -77,17 +81,49 @@ class Shell
         return $this;
     }
     
-    private function initClosures()
+    private function createProcess($processOptions)
+    {
+        $futureExitCode = new FutureValue($this->runUntilFutureRealisedFn);
+        
+        $canStartProcessFn = $this->canStartProcessFn;
+        if (!$canStartProcessFn()) {
+            $queueSlot = new FutureValue($this->runUntilFutureRealisedFn);
+            $process = new FutureProcess($processOptions, $futureExitCode, $queueSlot);
+            $this->queue->enqueue($queueSlot);
+        } else {
+            $process = new FutureProcess($processOptions, $futureExitCode);
+        }
+        
+        return $process;
+    }
+    
+    private function createCanStartProcessFn()
+    {
+        $activeProcesses = $this->activeProcesses;
+        $processLimit = &$this->processLimit;
+        
+        return function () use ($activeProcesses, &$processLimit) {
+            return (!$processLimit || $activeProcesses->count() < $processLimit);
+        };
+    }
+    
+    private function createHandleQueueFn()
     {
         $queue = $this->queue;
-        $this->handleQueueFn = function () use ($queue) {
-            while ($queue->count() && $this->canStartProcess()) {
+        $canStartProcessFn = $this->canStartProcessFn;
+        
+        return function () use ($queue, $canStartProcessFn) {
+            while ($queue->count() && $canStartProcessFn()) {
                 $queue->dequeue()->resolve();
             }
         };
-        
+    }
+    
+    private function createRunUntilFutureRealisedFn()
+    {
         $activeProcesses = $this->activeProcesses;
-        $this->runUntilFutureRealisedFn = function ($futureValue, $timeout) use ($activeProcesses) {
+        
+        return function ($futureValue, $timeout) use ($activeProcesses) {
             $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
 
             while (!$futureValue->isRealised()) {
@@ -105,10 +141,5 @@ class Shell
                 usleep(1000);
             }
         };
-    }
-    
-    private function canStartProcess()
-    {
-        return (!$this->processLimit || $this->activeProcesses->count() < $this->processLimit);
     }
 }
