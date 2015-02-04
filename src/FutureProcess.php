@@ -129,7 +129,7 @@ class FutureProcess
             
             array_splice($options, 2, 0, array(&$streams));
             $resource = call_user_func_array('proc_open', $options);
-            $status = self::STATUS_RUNNING;
+            $status = FutureProcess::STATUS_RUNNING;
         };
     }
     
