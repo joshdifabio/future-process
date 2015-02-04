@@ -25,16 +25,18 @@ class FutureValue
     public function resolve($value = null)
     {
         if (!$this->isRealised) {
-            $this->deferred->resolve($value);
+            $this->value = $value;
             $this->isRealised = true;
+            $this->deferred->resolve($value);
         }
     }
     
     public function reject(\Exception $e)
     {
         if (!$this->isRealised) {
-            $this->deferred->reject($e);
+            $this->error = $e;
             $this->isRealised = true;
+            $this->deferred->reject($e);
         }
     }
     

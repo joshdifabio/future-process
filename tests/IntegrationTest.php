@@ -24,14 +24,14 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
         $result = $shell->startProcess($command)->getResult()->wait(2);
         
-        $this->assertEquals(0, $result->getExitCode(), stream_get_contents($result->getStream(2)));
-        $this->assertEquals('Hello World', stream_get_contents($result->getStream(1)));
+        $this->assertSame(0, $result->getExitCode(), stream_get_contents($result->getStream(2)));
+        $this->assertSame('Hello World', stream_get_contents($result->getStream(1)));
     }
     
     public function testExecuteCommandWithTimeout()
     {
         $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"usleep(100000);\"";
+        $command = $this->phpSleepCommand(0.1);
         
         $startTime = microtime(true);
         try {
@@ -43,6 +43,31 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         }
         
         $result = $shell->startProcess($command)->getResult()->wait(0.2);
-        $this->assertEquals(0, $result->getExitCode());
+        $this->assertSame(0, $result->getExitCode());
+    }
+    
+    public function testQueue()
+    {
+        $shell = new Shell;
+        $shell->setProcessLimit(2);
+        
+        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process3 = $shell->startProcess($this->phpSleepCommand(0.5));
+        
+        usleep(100000);
+        
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process2->getStatus());
+        $this->assertSame(FutureProcess::STATUS_QUEUED, $process3->getStatus());
+        
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(0.5)->getStatus());
+    }
+    
+    private function phpSleepCommand($seconds)
+    {
+        $microSeconds = $seconds * 1000000;
+        
+        return "{$this->phpExecutablePath} -r \"usleep($microSeconds);\"";
     }
 }
