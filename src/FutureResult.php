@@ -25,6 +25,15 @@ class FutureResult
         return $this->process->getStream($descriptor);
     }
     
+    public function getStreamContents($descriptor)
+    {
+        $this->wait();
+        
+        if ($stream = $this->process->getStream($descriptor)) {
+            return stream_get_contents($stream);
+        }
+    }
+    
     public function getExitCode()
     {
         $this->wait();
