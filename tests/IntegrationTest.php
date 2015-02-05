@@ -25,7 +25,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $result = $shell->startProcess($command)->getResult()->wait(2);
         
         $this->assertSame(0, $result->getExitCode(), stream_get_contents($result->getStream(2)));
-        $this->assertSame('Hello World', stream_get_contents($result->getStream(1)));
+        $this->assertSame('Hello World', $result->getStreamContents(1));
     }
     
     public function testExecuteCommandWithTimeout()
