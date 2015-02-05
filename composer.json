@@ -1,5 +1,7 @@
 {
     "name": "joshdifabio/future-process",
+    "description": "Process execution for PHP using futures and promises",
+    "keywords": ["process", "child-process", "promise", "react"],
     "license": "MIT",
     "authors": [
         {
@@ -18,12 +20,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Joshdifabio\\FutureProcess\\": "src"
+            "FutureProcess\\": "src"
        }
     },
     "autoload-dev": {
         "psr-4": {
-            "Joshdifabio\\FutureProcess\\": "tests"
+            "FutureProcess\\": "tests"
         }
     }
 }

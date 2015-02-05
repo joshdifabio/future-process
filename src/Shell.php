@@ -1,5 +1,5 @@
 <?php
-namespace Joshdifabio\FutureProcess;
+namespace FutureProcess;
 
 class Shell
 {
