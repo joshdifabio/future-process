@@ -5,11 +5,10 @@
          bootstrap="vendor/autoload.php"
 >
     <testsuites>
-        <testsuite name="Child Process Test Suite">
+        <testsuite name="Future Process Test Suite">
             <directory>./tests/</directory>
         </testsuite>
     </testsuites>
-
 
     <filter>
         <whitelist>
