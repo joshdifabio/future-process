@@ -18,13 +18,6 @@ class FutureResult
         });
     }
     
-    public function getPid()
-    {
-        $this->wait();
-        
-        return $this->process->getPid();
-    }
-    
     public function getStream($descriptor)
     {
         $this->wait();

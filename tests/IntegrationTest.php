@@ -64,6 +64,19 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(0.5)->getStatus());
     }
     
+    public function testGetPid()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess("{$this->phpExecutablePath} -r \"echo getmypid();\"");
+        
+        $reportedPid = $process->getPid();
+        
+        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1));
+        
+        $this->assertSame($actualPid, $reportedPid);
+    }
+    
     private function phpSleepCommand($seconds)
     {
         $microSeconds = $seconds * 1000000;

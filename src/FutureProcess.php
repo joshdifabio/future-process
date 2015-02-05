@@ -16,6 +16,7 @@ class FutureProcess
     private $queueSlot;
     private $status;
     private $resource;
+    private $pid;
     private $streams;
     private $result;
     
@@ -59,9 +60,15 @@ class FutureProcess
         if ($refresh && $this->status === self::STATUS_RUNNING) {
             if (false === $status = proc_get_status($this->resource)) {
                 $this->doExit(self::STATUS_UNKNOWN);
-            } elseif (!$status['running']) {
-                $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
-                $this->doExit(self::STATUS_EXITED, $exitCode);
+            } else {
+                if (is_null($this->pid)) {
+                    $this->pid = $status['pid'];
+                }
+                
+                if (!$status['running']) {
+                    $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
+                    $this->doExit(self::STATUS_EXITED, $exitCode);
+                }
             }
         }
         
@@ -117,8 +124,11 @@ class FutureProcess
         $resource = &$this->resource;
         $streams = &$this->streams;
         $status = &$this->status;
+        $that = $this;
         
-        return function (array $options) use (&$resource, &$streams, &$status) {
+        return function (array $options) use (&$resource, &$streams, &$status, $that) {
+            $options[0] = 'exec ' . $options[0];
+            
             if (!isset($options[1])) {
                 $options[1] = array(
                     0 => array('pipe', 'r'),
@@ -130,6 +140,7 @@ class FutureProcess
             array_splice($options, 2, 0, array(&$streams));
             $resource = call_user_func_array('proc_open', $options);
             $status = FutureProcess::STATUS_RUNNING;
+            $that->getStatus(true);
         };
     }
     
