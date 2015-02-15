@@ -6,32 +6,31 @@ class FutureResult
     private $process;
     private $futureExitCode;
     private $promise;
+    private $streams = array();
     
     public function __construct(FutureProcess $process, FutureValue $futureExitCode)
     {
         $this->process = $process;
         $this->futureExitCode = $futureExitCode;
-        
-        $that = $this;
-        $this->promise = $this->futureExitCode->then(function () use ($that) {
-            return $that;
-        });
     }
     
     public function getStream($descriptor)
     {
-        $this->wait();
+        if (!isset($this->streams[$descriptor])) {
+            $process = $this->process;
+            $resourcePromise = $this->then(function () use ($process, $descriptor) {
+                return $process->getStream($descriptor)->getResource();
+            });
+
+            $this->streams[$descriptor] = new FutureStream(array($this, 'wait'), $resourcePromise);
+        }
         
-        return $this->process->getStream($descriptor);
+        return $this->streams[$descriptor];
     }
     
     public function getStreamContents($descriptor)
     {
-        $this->wait();
-        
-        if ($stream = $this->process->getStream($descriptor)) {
-            return stream_get_contents($stream);
-        }
+        return $this->getStream($descriptor)->getContents();
     }
     
     public function getExitCode()
@@ -51,8 +50,20 @@ class FutureResult
         return $this;
     }
     
+    public function promise()
+    {
+        if (!$this->promise) {
+            $that = $this;
+            $this->promise = $this->futureExitCode->then(function () use ($that) {
+                return $that;
+            });
+        }
+        
+        return $this->promise;
+    }
+    
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
-        return $this->promise->then($onFulfilled, $onError, $onProgress);
+        return $this->promise()->then($onFulfilled, $onError, $onProgress);
     }
 }

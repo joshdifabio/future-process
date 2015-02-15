@@ -24,7 +24,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
         $result = $shell->startProcess($command)->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), stream_get_contents($result->getStream(2)));
+        $this->assertSame(0, $result->getExitCode(), $result->getStreamContents(2));
         $this->assertSame('Hello World', $result->getStreamContents(1));
     }
     
@@ -72,7 +72,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $reportedPid = $process->getPid();
         
-        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1));
+        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1)->getResource());
         
         $this->assertSame($actualPid, $reportedPid);
     }
