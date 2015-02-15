@@ -123,7 +123,7 @@ class Shell
     {
         $activeProcesses = $this->activeProcesses;
         
-        return function ($futureValue, $timeout) use ($activeProcesses) {
+        return function ($timeout, $futureValue) use ($activeProcesses) {
             $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
 
             while (!$futureValue->isRealised()) {

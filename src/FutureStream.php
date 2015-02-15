@@ -36,8 +36,7 @@ class FutureStream
     
     public function wait($timeout = null)
     {
-        $waitFn = $this->waitFn;
-        $waitFn($timeout);
+        call_user_func($this->waitFn, $timeout, $this);
         
         return $this;
     }

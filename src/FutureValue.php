@@ -54,8 +54,7 @@ class FutureValue
     public function wait($timeout = null)
     {
         if (!$this->isRealised) {
-            $waitFn = $this->waitFn;
-            $waitFn($this, $timeout);
+            call_user_func($this->waitFn, $timeout, $this);
         }
     }
     
