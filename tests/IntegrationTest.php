@@ -77,6 +77,23 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($actualPid, $reportedPid);
     }
     
+    public function testLateStreamResolution()
+    {
+        $shell = new Shell;
+        
+        $result = $shell->startProcess("{$this->phpExecutablePath} -r \"echo 'hello';\"")
+            ->getResult();
+        
+        $output = null;
+        $result->then(function ($result) use (&$output) {
+            $output = $result->getStreamContents(1);
+        });
+        
+        $result->wait(2);
+        
+        $this->assertSame('hello', $output);
+    }
+    
     private function phpSleepCommand($seconds)
     {
         $microSeconds = $seconds * 1000000;
