@@ -19,7 +19,7 @@ class FutureProcess
     private $pid;
     private $streamResources;
     private $streams = array();
-    private $results;
+    private $result;
     
     public function __construct(
         array $options,
@@ -85,21 +85,13 @@ class FutureProcess
         return $this->status;
     }
     
-    public function getResult($exitCodeWhitelist = 0, $isBlacklist = false)
+    public function getResult()
     {
-        $exitCodeWhitelist = (array)$exitCodeWhitelist;
-        $key = (int)$isBlacklist . '-' . implode('-', $exitCodeWhitelist);
-        
-        if (!isset($this->results[$key])) {
-            $this->results[$key] = new FutureResult(
-                $this,
-                $this->futureExitCode,
-                $exitCodeWhitelist,
-                $isBlacklist
-            );
+        if (is_null($this->result)) {
+            $this->result = new FutureResult($this, $this->futureExitCode);
         }
         
-        return $this->results[$key];
+        return $this->result;
     }
     
     public function detach()

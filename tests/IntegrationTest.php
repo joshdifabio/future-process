@@ -28,56 +28,6 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame('Hello World', $result->getStreamContents(1));
     }
     
-    /**
-     * @expectedException \RuntimeException
-     */
-    public function testWaitError()
-    {
-        $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"echo 'This will error!'\"";
-        $shell->startProcess($command)->getResult(0)->wait(2);
-    }
-    
-    /**
-     * @expectedException \RuntimeException
-     */
-    public function testWaitError2()
-    {
-        $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"echo 'Hello world!';\"";
-        $shell->startProcess($command)->getResult(50)->wait(2);
-    }
-    
-    public function testPromiseError()
-    {
-        $error = null;
-        
-        $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"echo 'This will error!'\"";
-        $shell->startProcess($command)->getResult(0)->then(null, function ($_error) use (&$error) {
-            $error = $_error;
-        });
-        
-        $shell->run();
-        
-        $this->assertTrue($error instanceof \RuntimeException);
-    }
-    
-    public function testFailedResultStream()
-    {
-        $error = null;
-        
-        $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"echo 'This will error!'\"";
-        $shell->startProcess($command)->getResult(0)->getStream(1)->then(null, function ($_error) use (&$error) {
-            $error = $_error;
-        });
-        
-        $shell->run();
-        
-        $this->assertTrue($error instanceof \RuntimeException);
-    }
-    
     public function testExecuteCommandWithTimeout()
     {
         $shell = new Shell;
