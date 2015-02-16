@@ -4,6 +4,9 @@ namespace FutureProcess;
 use React\Promise\FulfilledPromise;
 use React\Promise\PromiseInterface;
 
+/**
+ * @author Josh Di Fabio <joshdifabio@gmail.com>
+ */
 class FutureProcess
 {
     const STATUS_QUEUED   = 0;

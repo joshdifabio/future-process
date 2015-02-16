@@ -3,6 +3,9 @@ namespace FutureProcess;
 
 use React\Promise\PromiseInterface;
 
+/**
+ * @author Josh Di Fabio <joshdifabio@gmail.com>
+ */
 class FutureResult
 {
     private $process;

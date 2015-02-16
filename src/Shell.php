@@ -1,6 +1,9 @@
 <?php
 namespace FutureProcess;
 
+/**
+ * @author Josh Di Fabio <joshdifabio@gmail.com>
+ */
 class Shell
 {
     private $processLimit = 10;

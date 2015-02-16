@@ -4,6 +4,9 @@ namespace FutureProcess;
 use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 
+/**
+ * @author Josh Di Fabio <joshdifabio@gmail.com>
+ */
 class FutureValue
 {
     private $waitFn;
