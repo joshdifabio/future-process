@@ -64,13 +64,20 @@ class FutureProcess
     {
         if (!isset($this->streams[$descriptor])) {
             $streamResources = &$this->streamResources;
-            $resourcePromise = $this->then(function () use (&$streamResources, $descriptor) {
+            $getResourceFn = function () use (&$streamResources, $descriptor) {
                 if (isset($streamResources[$descriptor])) {
                     return $streamResources[$descriptor];
                 }
-            });
-
-            $this->streams[$descriptor] = new FutureStream(array($this, 'wait'), $resourcePromise);
+            };
+            
+            $that = $this;
+            $this->streams[$descriptor] = new FutureStream(
+                function ($timeout = null) use ($that, $getResourceFn) {
+                    $that->wait($timeout);
+                    return $getResourceFn();
+                },
+                $this->then($getResourceFn)
+            );
         }
         
         return $this->streams[$descriptor];

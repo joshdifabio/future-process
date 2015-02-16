@@ -1,24 +1,22 @@
 <?php
 namespace FutureProcess;
 
+use React\Promise\PromiseInterface;
+
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
  */
 class FutureStream
 {
     private $waitFn;
+    private $resourcePromise;
     private $promise;
     private $resource;
     
-    public function __construct($waitFn, $resourcePromise)
+    public function __construct($waitForResourceFn, PromiseInterface $resourcePromise)
     {
-        $this->waitFn = $waitFn;
-        $resource = &$this->resource;
-        $that = $this;
-        $this->promise = $resourcePromise->then(function ($_resource) use (&$resource, $that) {
-            $resource = $_resource;
-            return $that;
-        });
+        $this->waitFn = $waitForResourceFn;
+        $this->resourcePromise = $resourcePromise;
     }
     
     /**
@@ -26,10 +24,8 @@ class FutureStream
      */
     public function getContents()
     {
-        $this->wait();
-        
-        if ($this->resource) {
-            return stream_get_contents($this->resource);
+        if ($resource = $this->getResource()) {
+            return stream_get_contents($resource);
         }
     }
     
@@ -49,7 +45,11 @@ class FutureStream
      */
     public function wait($timeout = null)
     {
-        call_user_func($this->waitFn, $timeout, $this);
+        $resource = call_user_func($this->waitFn, $timeout, $this);
+        
+        if (!$this->resource) {
+            $this->resource = $resource;
+        }
         
         return $this;
     }
@@ -59,6 +59,17 @@ class FutureStream
      */
     public function promise()
     {
+        if (!$this->promise) {
+            $resource = &$this->resource;
+            $that = $this;
+            $this->promise = $this->resourcePromise->then(
+                function ($_resource) use (&$resource, $that) {
+                    $resource = $_resource;
+                    return $that;
+                }
+            );
+        }
+        
         return $this->promise;
     }
     
@@ -70,6 +81,6 @@ class FutureStream
      */
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
-        return $this->promise->then($onFulfilled, $onError, $onProgress);
+        return $this->promise()->then($onFulfilled, $onError, $onProgress);
     }
 }

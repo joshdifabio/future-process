@@ -27,11 +27,18 @@ class FutureResult
     {
         if (!isset($this->streams[$descriptor])) {
             $process = $this->process;
-            $resourcePromise = $this->then(function () use ($process, $descriptor) {
+            $getResourceFn = function () use ($process, $descriptor) {
                 return $process->getStream($descriptor)->getResource();
-            });
-
-            $this->streams[$descriptor] = new FutureStream(array($this, 'wait'), $resourcePromise);
+            };
+            
+            $that = $this;
+            $this->streams[$descriptor] = new FutureStream(
+                function ($timeout = null) use ($that, $getResourceFn) {
+                    $that->wait($timeout);
+                    return $getResourceFn();
+                },
+                $this->then($getResourceFn)
+            );
         }
         
         return $this->streams[$descriptor];
@@ -52,8 +59,6 @@ class FutureResult
      */
     public function getExitCode()
     {
-        $this->wait();
-        
         return $this->futureExitCode->getValue();
     }
     
