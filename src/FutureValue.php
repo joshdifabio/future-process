@@ -56,6 +56,17 @@ class FutureValue
         if (!$this->isRealised) {
             call_user_func($this->waitFn, $timeout, $this);
         }
+        
+        if ($this->error) {
+            throw $this->error;
+        }
+        
+        return $this;
+    }
+    
+    public function promise()
+    {
+        return $this->deferred->promise();
     }
     
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
