@@ -45,7 +45,7 @@ class Shell
             $activeProcesses->detach($process);
             $handleQueueFn();
         };
-        $process->getResult()->then($onComplete, $onComplete, $onComplete);
+        $process->getResult()->then($onComplete, $onComplete);
         
         return $process;
     }
