@@ -2,6 +2,7 @@
 namespace FutureProcess;
 
 use React\Promise\FulfilledPromise;
+use React\Promise\PromiseInterface;
 
 class FutureProcess
 {
@@ -42,6 +43,9 @@ class FutureProcess
         }
     }
     
+    /**
+     * @return int
+     */
     public function getPid()
     {
         $this->wait();
@@ -49,6 +53,10 @@ class FutureProcess
         return $this->pid;
     }
     
+    /**
+     * @param int $descriptor
+     * @return FutureStream
+     */
     public function getStream($descriptor)
     {
         if (!isset($this->streams[$descriptor])) {
@@ -65,6 +73,10 @@ class FutureProcess
         return $this->streams[$descriptor];
     }
     
+    /**
+     * @param bool $refresh OPTIONAL
+     * @return int One of the status constants defined in this class
+     */
     public function getStatus($refresh = true)
     {
         if ($refresh && $this->status === self::STATUS_RUNNING) {
@@ -85,6 +97,9 @@ class FutureProcess
         return $this->status;
     }
     
+    /**
+     * @return FutureResult
+     */
     public function getResult()
     {
         if (is_null($this->result)) {
@@ -99,21 +114,23 @@ class FutureProcess
         if ($this->status === self::STATUS_RUNNING) {
             $this->doExit(self::STATUS_DETACHED);
         }
-        
-        return $this;
     }
     
+    /**
+     * @param int $signal
+     */
     public function kill($signal = 15)
     {
         if ($this->status === self::STATUS_RUNNING) {
             proc_terminate($this->resource, $signal);
         }
-        
-        return $this;
     }
     
     /**
      * Wait for the process to start
+     * 
+     * @param double $timeout OPTIONAL
+     * @return static
      */
     public function wait($timeout = null)
     {
@@ -124,11 +141,20 @@ class FutureProcess
         return $this;
     }
     
+    /**
+     * @return PromiseInterface
+     */
     public function promise()
     {
         return $this->promise;
     }
     
+    /**
+     * @param callable $onFulfilled
+     * @param callable $onError
+     * @param callable $onProgress
+     * @return PromiseInterface
+     */
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
         return $this->promise->then($onFulfilled, $onError, $onProgress);

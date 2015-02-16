@@ -19,6 +19,14 @@ class Shell
         $this->runUntilFutureRealisedFn = $this->createRunUntilFutureRealisedFn();
     }
     
+    /**
+     * @param string $command
+     * @param array $descriptorSpec OPTIONAL
+     * @param type $workingDirectory OPTIONAL
+     * @param array $environmentVariables OPTIONAL
+     * @param array $otherOptions OPTIONAL
+     * @return FutureProcess
+     */
     public function startProcess(
         $command,
         array $descriptorSpec = null,
@@ -50,11 +58,19 @@ class Shell
         return $process;
     }
     
+    /**
+     * @param null|int $processLimit
+     */
     public function setProcessLimit($processLimit)
     {
         $this->processLimit = $processLimit;
     }
     
+    /**
+     * @param bool $stopAutomatically OPTIONAL
+     * @param double $timeout OPTIONAL
+     * @throws TimeoutException
+     */
     public function run($stopAutomatically = true, $timeout = null)
     {
         $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
@@ -68,8 +84,6 @@ class Shell
             
             usleep(1000);
         }
-        
-        return $this;
     }
     
     public function refreshAllProcesses()
@@ -77,8 +91,6 @@ class Shell
         foreach ($this->activeProcesses as $process) {
             $process->getStatus(true);
         }
-        
-        return $this;
     }
     
     private function createProcess($processOptions)

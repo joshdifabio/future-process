@@ -18,6 +18,9 @@ class FutureStream
         });
     }
     
+    /**
+     * @return string
+     */
     public function getContents()
     {
         $this->wait();
@@ -27,6 +30,9 @@ class FutureStream
         }
     }
     
+    /**
+     * @return resource
+     */
     public function getResource()
     {
         $this->wait();
@@ -34,6 +40,10 @@ class FutureStream
         return $this->resource;
     }
     
+    /**
+     * @param double $timeout OPTIONAL
+     * @return static
+     */
     public function wait($timeout = null)
     {
         call_user_func($this->waitFn, $timeout, $this);
@@ -41,11 +51,20 @@ class FutureStream
         return $this;
     }
     
+    /**
+     * @return PromiseInterface
+     */
     public function promise()
     {
         return $this->promise;
     }
     
+    /**
+     * @param callable $onFulfilled
+     * @param callable $onError
+     * @param callable $onProgress
+     * @return PromiseInterface
+     */
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
         return $this->promise->then($onFulfilled, $onError, $onProgress);

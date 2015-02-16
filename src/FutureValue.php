@@ -2,6 +2,7 @@
 namespace FutureProcess;
 
 use React\Promise\Deferred;
+use React\Promise\PromiseInterface;
 
 class FutureValue
 {
@@ -17,11 +18,17 @@ class FutureValue
         $this->deferred = new Deferred;
     }
     
+    /**
+     * @return bool
+     */
     public function isRealised()
     {
         return $this->isRealised;
     }
     
+    /**
+     * @param mixed $value OPTIONAL
+     */
     public function resolve($value = null)
     {
         if (!$this->isRealised) {
@@ -31,6 +38,9 @@ class FutureValue
         }
     }
     
+    /**
+     * @param \Exception $e
+     */
     public function reject(\Exception $e)
     {
         if (!$this->isRealised) {
@@ -40,6 +50,10 @@ class FutureValue
         }
     }
     
+    /**
+     * @param double $timeout OPTIONAL
+     * @return mixed
+     */
     public function getValue($timeout = null)
     {
         $this->wait($timeout);
@@ -51,13 +65,25 @@ class FutureValue
         return $this->value;
     }
 
+    /**
+     * @param double $timeout
+     * @return static
+     */
     public function wait($timeout = null)
     {
         if (!$this->isRealised) {
             call_user_func($this->waitFn, $timeout, $this);
         }
+        
+        return $this;
     }
     
+    /**
+     * @param callable $onFulfilled
+     * @param callable $onError
+     * @param callable $onProgress
+     * @return PromiseInterface
+     */
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
         return $this->deferred->promise()->then($onFulfilled, $onError, $onProgress);
