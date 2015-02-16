@@ -34,7 +34,7 @@ class Shell
             $descriptorSpec,
             $workingDirectory,
             $environmentVariables,
-            $otherOptions
+            $otherOptions,
         ));
 
         $activeProcesses = $this->activeProcesses;
