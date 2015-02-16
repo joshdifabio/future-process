@@ -7,8 +7,6 @@ class FutureResult
 {
     private $process;
     private $futureExitCode;
-    private $exitCodeWhitelist;
-    private $exitCodesAreBlacklist;
     private $promise;
     private $streams = array();
     private $error;
@@ -21,8 +19,26 @@ class FutureResult
     ) {
         $this->process = $process;
         $this->futureExitCode = $futureExitCode;
-        $this->exitCodeWhitelist = $exitCodeWhitelist;
-        $this->exitCodesAreBlacklist = $exitCodesAreBlacklist;
+        
+        $error = &$this->error;
+        $that = $this;
+        $this->promise = $this->futureExitCode->then(
+            function ($exitCode) use ($exitCodeWhitelist, $exitCodesAreBlacklist, &$error, $that) {
+                if ($exitCodeWhitelist) {
+                    if ($exitCodesAreBlacklist) {
+                        if (in_array($exitCode, $exitCodeWhitelist)) {
+                            $error = new \RuntimeException;
+                            return new RejectedPromise($error);
+                        }
+                    } elseif (!in_array($exitCode, $exitCodeWhitelist)) {
+                        $error = new \RuntimeException;
+                        return new RejectedPromise($error);
+                    }
+                }
+
+                return $that;
+            }
+        );
     }
     
     public function getStream($descriptor)
@@ -67,35 +83,11 @@ class FutureResult
     
     public function promise()
     {
-        if (!$this->promise) {
-            $exitCodes = $this->exitCodeWhitelist;
-            $isBlacklist = $this->exitCodesAreBlacklist;
-            $error = &$this->error;
-            $that = $this;
-            $this->promise = $this->futureExitCode->then(
-                function ($exitCode) use ($exitCodes, $isBlacklist, &$error, $that) {
-                    if ($exitCodes) {
-                        if ($isBlacklist) {
-                            if (in_array($exitCode, $exitCodes)) {
-                                $error = new \RuntimeException;
-                                return new RejectedPromise($error);
-                            }
-                        } elseif (!in_array($exitCode, $exitCodes)) {
-                            $error = new \RuntimeException;
-                            return new RejectedPromise($error);
-                        }
-                    }
-                    
-                    return $that;
-                }
-            );
-        }
-        
         return $this->promise;
     }
     
     public function then($onFulfilled = null, $onError = null, $onProgress = null)
     {
-        return $this->promise()->then($onFulfilled, $onError, $onProgress);
+        return $this->promise->then($onFulfilled, $onError, $onProgress);
     }
 }

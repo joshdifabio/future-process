@@ -38,6 +38,16 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $shell->startProcess($command)->getResult(0)->wait(2);
     }
     
+    /**
+     * @expectedException \RuntimeException
+     */
+    public function testWaitError2()
+    {
+        $shell = new Shell;
+        $command = "{$this->phpExecutablePath} -r \"echo 'Hello world!';\"";
+        $shell->startProcess($command)->getResult(50)->wait(2);
+    }
+    
     public function testPromiseError()
     {
         $error = null;
