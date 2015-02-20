@@ -72,7 +72,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $reportedPid = $process->getPid();
         
-        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1)->getResource());
+        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1));
         
         $this->assertSame($actualPid, $reportedPid);
     }

@@ -21,8 +21,7 @@ class FutureProcess
     private $status;
     private $resource;
     private $pid;
-    private $streamResources;
-    private $streams = array();
+    private $streams;
     private $result;
     
     public function __construct(
@@ -58,29 +57,13 @@ class FutureProcess
     
     /**
      * @param int $descriptor
-     * @return FutureStream
+     * @return null|resource
      */
     public function getStream($descriptor)
     {
-        if (!isset($this->streams[$descriptor])) {
-            $streamResources = &$this->streamResources;
-            $getResourceFn = function () use (&$streamResources, $descriptor) {
-                if (isset($streamResources[$descriptor])) {
-                    return $streamResources[$descriptor];
-                }
-            };
+        $this->wait();
             
-            $that = $this;
-            $this->streams[$descriptor] = new FutureStream(
-                function ($timeout = null) use ($that, $getResourceFn) {
-                    $that->wait($timeout);
-                    return $getResourceFn();
-                },
-                $this->then($getResourceFn)
-            );
-        }
-        
-        return $this->streams[$descriptor];
+        return !array_key_exists($descriptor, $this->streams) ? null : $this->streams[$descriptor];
     }
     
     /**
@@ -173,11 +156,11 @@ class FutureProcess
     private function getStartFn()
     {
         $resource = &$this->resource;
-        $streamResources = &$this->streamResources;
+        $streams = &$this->streams;
         $status = &$this->status;
         $that = $this;
         
-        return function (array $options) use (&$resource, &$streamResources, &$status, $that) {
+        return function (array $options) use (&$resource, &$streams, &$status, $that) {
             $options[0] = 'exec ' . $options[0];
             
             if (!isset($options[1])) {
@@ -188,7 +171,7 @@ class FutureProcess
                 );
             }
             
-            array_splice($options, 2, 0, array(&$streamResources));
+            array_splice($options, 2, 0, array(&$streams));
             $resource = call_user_func_array('proc_open', $options);
             $status = FutureProcess::STATUS_RUNNING;
             $that->getStatus(true);

@@ -11,7 +11,6 @@ class FutureResult
     private $process;
     private $futureExitCode;
     private $promise;
-    private $streams = array();
     
     public function __construct(FutureProcess $process, FutureValue $futureExitCode)
     {
@@ -21,27 +20,13 @@ class FutureResult
     
     /**
      * @param int $descriptor
-     * @return FutureStream
+     * @return null|resource
      */
     public function getStream($descriptor)
     {
-        if (!isset($this->streams[$descriptor])) {
-            $process = $this->process;
-            $getResourceFn = function () use ($process, $descriptor) {
-                return $process->getStream($descriptor)->getResource();
-            };
+        $this->wait();
             
-            $that = $this;
-            $this->streams[$descriptor] = new FutureStream(
-                function ($timeout = null) use ($that, $getResourceFn) {
-                    $that->wait($timeout);
-                    return $getResourceFn();
-                },
-                $this->then($getResourceFn)
-            );
-        }
-        
-        return $this->streams[$descriptor];
+        return $this->process->getStream($descriptor);
     }
     
     /**
@@ -50,7 +35,11 @@ class FutureResult
      */
     public function getStreamContents($descriptor)
     {
-        return $this->getStream($descriptor)->getContents();
+        $this->wait();
+        
+        if ($stream = $this->process->getStream($descriptor)) {
+            return stream_get_contents($stream);
+        }
     }
     
     /**
