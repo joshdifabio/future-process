@@ -54,23 +54,8 @@ class FutureValue
     }
     
     /**
-     * @param double $timeout OPTIONAL
-     * @return mixed
-     */
-    public function getValue($timeout = null)
-    {
-        $this->wait($timeout);
-        
-        if ($this->error) {
-            throw $this->error;
-        }
-        
-        return $this->value;
-    }
-
-    /**
      * @param double $timeout
-     * @return static
+     * @return mixed
      */
     public function wait($timeout = null)
     {
@@ -78,7 +63,11 @@ class FutureValue
             call_user_func($this->waitFn, $timeout, $this);
         }
         
-        return $this;
+        if ($this->error) {
+            throw $this->error;
+        }
+        
+        return $this->value;
     }
     
     /**

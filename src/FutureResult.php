@@ -48,7 +48,7 @@ class FutureResult
      */
     public function getExitCode()
     {
-        return $this->futureExitCode->getValue();
+        return $this->futureExitCode->wait();
     }
     
     /**
