@@ -40,13 +40,7 @@ class Shell
         $handleQueueFn = $this->handleQueueFn;
         $handleQueueFn();
         
-        $process = $this->createProcess(array(
-            $command,
-            $descriptorSpec,
-            $workingDirectory,
-            $environmentVariables,
-            $otherOptions,
-        ));
+        $process = $this->createProcess(func_get_args());
 
         $activeProcesses = $this->activeProcesses;
         $process->then(function () use ($activeProcesses, $process) {
