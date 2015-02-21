@@ -70,22 +70,28 @@ class Shell
     }
     
     /**
-     * @param bool $stopAutomatically OPTIONAL
      * @param double $timeout OPTIONAL
      * @throws TimeoutException
      */
-    public function run($stopAutomatically = true, $timeout = null)
+    public function wait($timeout = null)
     {
-        $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
-        
-        while (!$stopAutomatically || $this->activeProcesses->count() || $this->queue->count()) {
-            $this->refreshAllProcesses();
+        if ($timeout) {
+            $absoluteTimeout = microtime(true) + $timeout;
             
-            if ($absoluteTimeout && microtime(true) >= $absoluteTimeout) {
-                throw new TimeoutException;
+            while ($this->activeProcesses->count() || $this->queue->count()) {
+                $this->refreshAllProcesses();
+
+                if (microtime(true) >= $absoluteTimeout) {
+                    throw new TimeoutException;
+                }
+
+                usleep(1000);
             }
-            
-            usleep(1000);
+        } else {
+            while ($this->activeProcesses->count() || $this->queue->count()) {
+                $this->refreshAllProcesses();
+                usleep(1000);
+            }
         }
     }
     
