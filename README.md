@@ -45,7 +45,7 @@ $shell->setProcessLimit(5);
 
 $process = $shell->startProcess('wget -O - https://github.com/joshdifabio/future-process/blob/master/LICENSE');
 
-// this will block until the process starts or fails to start
+// this will block until the process starts
 $process->wait();
 echo "Downloading file...\n";
 
