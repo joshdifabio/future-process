@@ -12,11 +12,11 @@ use FutureProcess\FutureProcess;
 use FutureProcess\FutureResult;
 
 $shell = new Shell;
-
 // run a max of 5 concurrent processes - additional ones will be queued
 $shell->setProcessLimit(5);
 
-$process = $shell->startProcess('wget -O - https://github.com/joshdifabio/future-process/blob/master/LICENSE');
+$url = 'https://raw.githubusercontent.com/joshdifabio/future-process/master/LICENSE';
+$process = $shell->startProcess("wget -O - $url");
 
 // this will not block, even if the process is queued
 $process->then(function (FutureProcess $process) {
@@ -39,18 +39,18 @@ Blocking usage
 use FutureProcess\Shell;
 
 $shell = new Shell;
-
 // run a max of 5 concurrent processes - additional ones will be queued
 $shell->setProcessLimit(5);
 
-$process = $shell->startProcess('wget -O - https://github.com/joshdifabio/future-process/blob/master/LICENSE');
+$url = 'https://raw.githubusercontent.com/joshdifabio/future-process/master/LICENSE';
+$process = $shell->startProcess("wget -O - $url");
 
 // this will block until the process starts
 $process->wait();
 echo "Downloading file...\n";
 
 // this will block until the process exits
-echo "File contents:\n{$result->getStreamContents(1)}\n";
+echo "File contents:\n{$process->getResult()->getStreamContents(1)}\n";
 ```
 
 License
