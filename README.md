@@ -11,7 +11,7 @@ use FutureProcess\Shell;
 use FutureProcess\FutureProcess;
 use FutureProcess\FutureResult;
 
-$shell = new Shell
+$shell = new Shell;
 
 // run a max of 5 concurrent processes - additional ones will be queued
 $shell->setProcessLimit(5);
@@ -38,7 +38,7 @@ Blocking usage
 ```php
 use FutureProcess\Shell;
 
-$shell = new Shell
+$shell = new Shell;
 
 // run a max of 5 concurrent processes - additional ones will be queued
 $shell->setProcessLimit(5);
