@@ -42,7 +42,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->assertGreaterThanOrEqual(0.05, $runTime);
         }
         
-        $result = $shell->startProcess($command)->getResult()->wait(0.2);
+        $result = $shell->startProcess($command)->getResult()->wait(0.5);
         $this->assertSame(0, $result->getExitCode());
     }
     
@@ -61,7 +61,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process2->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process3->getStatus());
         
-        $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(0.5)->getStatus());
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(1)->getStatus());
     }
     
     public function testGetPid()
