@@ -56,7 +56,7 @@ echo "File contents:\n{$process->getResult()->getStreamContents(1)}\n";
 
 Install Future Process using [composer](https://getcomposer.org/).
 
-`composer install joshdifabio/future-process`
+`composer require joshdifabio/future-process`
 
 ## License
 
