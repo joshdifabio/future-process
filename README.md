@@ -4,11 +4,12 @@
 
 ## Introduction
 
-This library provides an asynchronous implementation of PHP's `proc_open` with magic queueing of commands.
+Future Process provides an asynchronous implementation of PHP's `proc_open` with automatic queueing of commands.
 
 ## Usage
 
 ```php
+// we use Shell to start new processes
 $shell = new \FutureProcess\Shell;
 
 // run a maximum of 5 concurrent processes - additional ones will be queued
@@ -20,6 +21,8 @@ $process = $shell->startProcess("wget -O - $url");
 ```
 
 ### Non-blocking
+
+We can consume the process output using [promises](https://github.com/reactphp/promise).
 
 ```php
 // this will not block, even if the process is queued
@@ -38,6 +41,8 @@ $shell->wait();
 
 ### Blocking
 
+We can also consume the process output using synchronous methods.
+
 ```php
 // this will block until the process starts
 $process->wait();
@@ -46,6 +51,12 @@ echo "Downloading file...\n";
 // this will block until the process exits
 echo "File contents:\n{$process->getResult()->getStreamContents(1)}\n";
 ```
+
+## Installation
+
+Install Future Process using [composer](https://getcomposer.org/).
+
+`composer install joshdifabio/future-process`
 
 ## License
 
