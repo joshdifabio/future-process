@@ -4,7 +4,7 @@
 
 ## Introduction
 
-Future Process provides an asynchronous implementation of PHP's `proc_open` with automatic queueing of commands.
+Future Process is object-oriented `proc_open` with an asynchronous API and automatic queueing of commands.
 
 ## Usage
 
@@ -41,7 +41,7 @@ $shell->wait();
 
 ### Blocking
 
-We can also consume the process output using synchronous methods.
+We can also consume the process output synchronously.
 
 ```php
 // this will block until the process starts
