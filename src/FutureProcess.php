@@ -252,19 +252,7 @@ class FutureProcess
     
     private function drainWriteBuffers()
     {
-        if ($this->status !== self::STATUS_RUNNING || !$this->buffers['write']) {
-            return;
-        }
-        
-        $read = null;
-        $write = array_intersect_key($this->pipes, $this->buffers['write']);
-        $except = null;
-        
-        if (false === stream_select($read, $write, $except, 0)) {
-            throw new \RuntimeException('An error occurred when polling process pipes.');
-        }
-        
-        foreach ($write as $pipe) {
+        foreach ($this->getWritablePipes() as $pipe) {
             // prior PHP 5.4 the array passed to stream_select is modified and
             // lose key association, we have to find back the key
             $id = array_search($pipe, $this->pipes);
@@ -281,8 +269,37 @@ class FutureProcess
     
     private function fillReadBuffers()
     {
+        foreach ($this->getReadablePipes() as $pipe) {
+            // prior PHP 5.4 the array passed to stream_select is modified and
+            // lose key association, we have to find back the key
+            $id = array_search($pipe, $this->pipes);
+            while ($data = fread($pipe, 8192)) {
+                $this->buffers['read'][$id] .= $data;
+            }
+        }
+    }
+    
+    private function getWritablePipes()
+    {
+        if ($this->status !== self::STATUS_RUNNING || !$this->buffers['write']) {
+            return array();
+        }
+        
+        $read = null;
+        $write = array_intersect_key($this->pipes, $this->buffers['write']);
+        $except = null;
+        
+        if (false === stream_select($read, $write, $except, 0)) {
+            throw new \RuntimeException('An error occurred when polling process pipes.');
+        }
+        
+        return $write;
+    }
+    
+    private function getReadablePipes()
+    {
         if ($this->status !== self::STATUS_RUNNING || !$this->buffers['read']) {
-            return;
+            return array();
         }
         
         $read = array_intersect_key($this->pipes, $this->buffers['read']);
@@ -293,13 +310,6 @@ class FutureProcess
             throw new \RuntimeException('An error occurred when polling process pipes.');
         }
         
-        foreach ($read as $pipe) {
-            // prior PHP 5.4 the array passed to stream_select is modified and
-            // lose key association, we have to find back the key
-            $id = array_search($pipe, $this->pipes);
-            while ($data = fread($pipe, 8192)) {
-                $this->buffers['read'][$id] .= $data;
-            }
-        }
+        return $read;
     }
 }
