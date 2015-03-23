@@ -198,11 +198,10 @@ class FutureProcess
     {
         $resource = &$this->resource;
         $pipes = &$this->pipes;
-        $buffers = &$this->inputBuffers;
         $status = &$this->status;
         $that = $this;
         
-        return function (array $options) use (&$resource, &$pipes, &$buffers, &$status, $that) {
+        return function (array $options) use (&$resource, &$pipes, &$status, $that) {
             $options[0] = 'exec ' . $options[0];
             array_splice($options, 2, 0, array(&$pipes));
             $resource = call_user_func_array('proc_open', $options);
