@@ -30,7 +30,6 @@ class FutureResult
     }
     
     /**
-     * @param int $descriptor
      * @return null|int
      */
     public function getExitCode()
