@@ -24,8 +24,8 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
         $result = $shell->startProcess($command)->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), $result->getStreamContents(2));
-        $this->assertSame('Hello World', $result->getStreamContents(1));
+        $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
+        $this->assertSame('Hello World', $result->readFromBuffer(1));
     }
     
     public function testExecuteCommandWithTimeout()
@@ -72,7 +72,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $reportedPid = $process->getPid();
         
-        $actualPid = (int)stream_get_contents($process->getResult()->getStream(1));
+        $actualPid = (int)$process->getResult()->readFromBuffer(1);
         
         $this->assertSame($actualPid, $reportedPid);
     }
@@ -86,12 +86,39 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $output = null;
         $result->then(function ($result) use (&$output) {
-            $output = $result->getStreamContents(1);
+            $output = $result->readFromBuffer(1);
         });
         
         $result->wait(2);
         
         $this->assertSame('hello', $output);
+    }
+    
+    public function testBufferFill()
+    {
+        $shell = new Shell;
+
+        $result = $shell->startProcess("php -r \"echo str_repeat('x', 100000);\"")
+            ->getResult();
+
+        try {
+            $result->wait(0.5);
+        } catch (TimeoutException $e) {
+            $this->fail('The child process is blocked. The output buffer is probably full.');
+        }
+
+        $this->assertSame(100000, strlen($result->readFromBuffer(1)));
+    }
+    
+    public function testRepeatedReadCalls()
+    {
+        $shell = new Shell;
+        $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
+        $result = $shell->startProcess($command)->getResult()->wait(2);
+        
+        $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
+        $this->assertSame('Hello World', $result->readFromBuffer(1));
+        $this->assertSame('', $result->readFromBuffer(1));
     }
     
     private function phpSleepCommand($seconds)

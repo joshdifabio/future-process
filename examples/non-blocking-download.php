@@ -17,7 +17,7 @@ $process->then(function (FutureProcess $process) {
 
 // this will not block, even if the process is queued
 $process->getResult()->then(function (FutureResult $result) {
-    echo "File contents:\n{$result->getStreamContents(1)}\n";
+    echo "File contents:\n{$result->readFromBuffer(1)}\n";
 });
 
 // this will block until all processes have exited

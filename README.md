@@ -25,7 +25,7 @@ $process->then(function (FutureProcess $process) {
 
 // this will not block, even if the process is queued
 $process->getResult()->then(function (FutureResult $result) {
-    echo "File contents:\n{$result->getStreamContents(1)}\n";
+    echo "File contents:\n{$result->readFromBuffer(1)}\n";
 });
 
 // this will block until all processes have exited
@@ -50,7 +50,7 @@ $process->wait();
 echo "Downloading file...\n";
 
 // this will block until the process exits
-echo "File contents:\n{$process->getResult()->getStreamContents(1)}\n";
+echo "File contents:\n{$process->getResult()->readFromBuffer(1)}\n";
 ```
 
 License

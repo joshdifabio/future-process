@@ -13,4 +13,4 @@ $process->wait();
 echo "Downloading file...\n";
 
 // this will block until the process exits
-echo "File contents:\n{$process->getResult()->getStreamContents(1)}\n";
+echo "File contents:\n{$process->getResult()->readFromBuffer(1)}\n";

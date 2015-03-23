@@ -20,26 +20,13 @@ class FutureResult
     
     /**
      * @param int $descriptor
-     * @return null|resource
+     * @return string
      */
-    public function getStream($descriptor)
-    {
-        $this->wait();
-            
-        return $this->process->getStream($descriptor);
-    }
-    
-    /**
-     * @param int $descriptor
-     * @return null|string
-     */
-    public function getStreamContents($descriptor)
+    public function readFromBuffer($descriptor)
     {
         $this->wait();
         
-        if ($stream = $this->process->getStream($descriptor)) {
-            return stream_get_contents($stream);
-        }
+        return $this->process->readFromBuffer($descriptor);
     }
     
     /**
