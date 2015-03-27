@@ -28,12 +28,39 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $process->abort($thrown);
         });
         
+        $process->wait(0.5); // this should not error
+        
         try {
             $process->getResult()->wait(1);
             $this->fail('Expected Exception was not thrown');
         } catch (ProcessAbortedException $caught) {
             $this->assertSame($thrown, $caught);
         }
+        
+        $process->wait(0); // this should not error
+        
+        $that = $this;
+        $processPromiseResolved = false;
+        $process->then(
+            function () use (&$processPromiseResolved) {
+                $processPromiseResolved = true;
+            },
+            function () use ($that) {
+                $that->fail();
+            }
+        );
+        $this->assertTrue($processPromiseResolved);
+        
+        $resultPromiseRejected = false;
+        $process->getResult()->then(
+            function () use ($that) {
+                $that->fail();
+            },
+            function () use (&$resultPromiseRejected) {
+                $resultPromiseRejected = true;
+            }
+        );
+        $this->assertTrue($resultPromiseRejected);
     }
     
     public function testAbortQueuedProcess()
@@ -50,11 +77,30 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $process2->abort($thrown);
         
         try {
-            $process2->wait(1);
+            $process2->wait(0);
             $this->fail('Expected Exception was not thrown');
         } catch (ProcessAbortedException $caught) {
             $this->assertSame($thrown, $caught);
         }
+        
+        try {
+            $process2->getResult()->wait(0);
+            $this->fail('Expected Exception was not thrown');
+        } catch (ProcessAbortedException $caught) {
+            $this->assertSame($thrown, $caught);
+        }
+        
+        $processPromiseError = null;
+        $process2->then(null, function ($caught) use (&$processPromiseError) {
+            $processPromiseError = $caught;
+        });
+        $this->assertSame($thrown, $processPromiseError);
+        
+        $resultPromiseError = null;
+        $process2->getResult()->then(null, function ($caught) use (&$resultPromiseError) {
+            $resultPromiseError = $caught;
+        });
+        $this->assertSame($thrown, $resultPromiseError);
     }
     
     public function testPHPHelloWorld()
