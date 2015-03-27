@@ -12,14 +12,17 @@ class FutureProcess
     const STATUS_QUEUED   = 0;
     const STATUS_RUNNING  = 1;
     const STATUS_EXITED   = 2;
-    const STATUS_DETACHED = 3;
+    const STATUS_ABORTED  = 3;
     const STATUS_UNKNOWN  = 4;
     
     private $promise;
+    private $timeLimit;
+    private $timeoutSignal;
     private $futureExitCode;
     private $queueSlot;
     private $status;
     private $resource;
+    private $startTime;
     private $pid;
     private $pipes;
     private $buffers = array(
@@ -30,20 +33,31 @@ class FutureProcess
     
     public function __construct(
         array $options,
+        $timeLimit,
+        $timeoutSignal,
         FutureValue $futureExitCode,
         FutureValue $queueSlot = null
     ) {
+        $this->timeLimit = $timeLimit;
+        $this->timeoutSignal = $timeoutSignal;
         $this->futureExitCode = $futureExitCode;
+        
         $startFn = $this->getStartFn();
         $options[1] = $this->prepareDescriptorSpec(isset($options[1]) ? $options[1] : null);
         
         if ($this->queueSlot = $queueSlot) {
             $this->status = self::STATUS_QUEUED;
             $that = $this;
-            $this->promise = $queueSlot->then(function () use ($startFn, $options, $that) {
-                $startFn($options);
-                return $that;
-            });
+            $this->promise = $queueSlot->then(
+                function () use ($startFn, $options, $that) {
+                    $startFn($options);
+                    return $that;
+                },
+                function (\Exception $e) use ($that) {
+                    $that->abort($e);
+                    throw $e;
+                }
+            );
         } else {
             $startFn($options);
             $this->promise = new FulfilledPromise($this);
@@ -97,7 +111,7 @@ class FutureProcess
             throw new \RuntimeException('No pipe exists for the specified descriptor.');
         }
         
-        $this->fillReadBuffers();
+        $this->drainProcessOutputBuffers();
         $data = $this->buffers['read'][$descriptor];
         $this->buffers['read'][$descriptor] = '';
         
@@ -112,10 +126,10 @@ class FutureProcess
     {
         if ($refresh && $this->status === self::STATUS_RUNNING) {
             $this->drainWriteBuffers();
-            $this->fillReadBuffers();
+            $this->drainProcessOutputBuffers();
             
             if (false === $status = proc_get_status($this->resource)) {
-                $this->doExit(self::STATUS_UNKNOWN);
+                $this->doExit(self::STATUS_UNKNOWN, new \RuntimeException('An unknown error occurred.'));
             } else {
                 if (is_null($this->pid)) {
                     $this->pid = $status['pid'];
@@ -124,6 +138,14 @@ class FutureProcess
                 if (!$status['running']) {
                     $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
                     $this->doExit(self::STATUS_EXITED, $exitCode);
+                } elseif ($this->timeLimit && microtime(true) > $this->startTime + $this->timeLimit) {
+                    $this->abort(
+                        new ProcessAbortedException(
+                            $this,
+                            sprintf('The process exceeded it\'s maximum execution time of %fs and was aborted.', $this->timeLimit)
+                        ),
+                        $this->timeoutSignal
+                    );
                 }
             }
         }
@@ -143,21 +165,23 @@ class FutureProcess
         return $this->result;
     }
     
-    public function detach()
-    {
-        if ($this->status === self::STATUS_RUNNING) {
-            $this->doExit(self::STATUS_DETACHED);
-        }
-    }
-    
     /**
-     * @param int $signal
+     * @param \Exception $e
+     * @param int|null $signal If null is passed, no signal will be sent to the process
      */
-    public function kill($signal = 15)
+    public function abort(\Exception $e, $signal = 15)
     {
         if ($this->status === self::STATUS_RUNNING) {
-            proc_terminate($this->resource, $signal);
+            if (null !== $signal) {
+                proc_terminate($this->resource, $signal);
+            }
+        } elseif ($this->status === self::STATUS_QUEUED) {
+            $this->queueSlot->reject($e);
+        } else {
+            return;
         }
+        
+        $this->doExit(self::STATUS_ABORTED, $e);
     }
     
     /**
@@ -168,7 +192,7 @@ class FutureProcess
      */
     public function wait($timeout = null)
     {
-        if ($this->status === self::STATUS_QUEUED) {
+        if ($this->queueSlot) {
             $this->queueSlot->wait($timeout);
         }
         
@@ -199,24 +223,35 @@ class FutureProcess
         $resource = &$this->resource;
         $pipes = &$this->pipes;
         $status = &$this->status;
+        $startTime = &$this->startTime;
         $that = $this;
         
-        return function (array $options) use (&$resource, &$pipes, &$status, $that) {
+        return function (array $options) use (&$resource, &$pipes, &$status, &$startTime, $that) {
             $options[0] = 'exec ' . $options[0];
             array_splice($options, 2, 0, array(&$pipes));
             $resource = call_user_func_array('proc_open', $options);
+            $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
             $that->getStatus(true);
         };
     }
     
-    private function doExit($status, $exitCode = null)
+    private function doExit($status, $exitCodeOrException)
     {
         $this->status = $status;
-        $this->futureExitCode->resolve($exitCode);
-        $this->fillReadBuffers();
-        foreach ($this->pipes as $pipe) {
-            fclose($pipe);
+        
+        if (null !== $this->pipes) {
+            $this->drainProcessOutputBuffers();
+            foreach ($this->pipes as $pipe) {
+                fclose($pipe);
+            }
+            $this->pipes = null;
+        }
+        
+        if (is_int($exitCodeOrException)) {
+            $this->futureExitCode->resolve($exitCodeOrException);
+        } else {
+            $this->futureExitCode->reject($exitCodeOrException);
         }
     }
     
@@ -267,7 +302,7 @@ class FutureProcess
         }
     }
     
-    private function fillReadBuffers()
+    private function drainProcessOutputBuffers()
     {
         foreach ($this->getReadablePipes() as $pipe) {
             // prior PHP 5.4 the array passed to stream_select is modified and

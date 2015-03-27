@@ -18,6 +18,45 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
+    public function testAbortRunningProcess()
+    {
+        $shell = new Shell;
+        $process = $shell->startProcess($this->phpSleepCommand(0.5));
+        
+        $thrown = new ProcessAbortedException($process);
+        $process->then(function ($process) use ($thrown) {
+            $process->abort($thrown);
+        });
+        
+        try {
+            $process->getResult()->wait(1);
+            $this->fail('Expected Exception was not thrown');
+        } catch (ProcessAbortedException $caught) {
+            $this->assertSame($thrown, $caught);
+        }
+    }
+    
+    public function testAbortQueuedProcess()
+    {
+        $shell = new Shell;
+        $shell->setProcessLimit(1);
+        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
+        
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
+        $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
+        
+        $thrown = new ProcessAbortedException($process2);
+        $process2->abort($thrown);
+        
+        try {
+            $process2->wait(1);
+            $this->fail('Expected Exception was not thrown');
+        } catch (ProcessAbortedException $caught) {
+            $this->assertSame($thrown, $caught);
+        }
+    }
+    
     public function testPHPHelloWorld()
     {
         $shell = new Shell;
