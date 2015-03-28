@@ -119,28 +119,7 @@ class FutureProcess
     public function getStatus($refresh = true)
     {
         if ($refresh && $this->status === self::STATUS_RUNNING) {
-            $this->pipes->drainBuffers();
-            
-            if (false === $status = proc_get_status($this->resource)) {
-                $this->doExit(self::STATUS_UNKNOWN, new \RuntimeException('An unknown error occurred.'));
-            } else {
-                if (is_null($this->pid)) {
-                    $this->pid = $status['pid'];
-                }
-                
-                if (!$status['running']) {
-                    $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
-                    $this->doExit(self::STATUS_EXITED, $exitCode);
-                } elseif ($this->timeLimit && microtime(true) > $this->startTime + $this->timeLimit) {
-                    $this->abort(
-                        new ProcessAbortedException(
-                            $this,
-                            sprintf('The process exceeded it\'s maximum execution time of %fs and was aborted.', $this->timeLimit)
-                        ),
-                        $this->timeoutSignal
-                    );
-                }
-            }
+            $this->refreshStatus();
         }
         
         return $this->status;
@@ -211,23 +190,57 @@ class FutureProcess
         return $this->promise->then($onFulfilled, $onError, $onProgress);
     }
     
+    private function refreshStatus()
+    {
+        if (false === $status = proc_get_status($this->resource)) {
+            $this->doExit(self::STATUS_UNKNOWN, new \RuntimeException('An unknown error occurred.'));
+        } elseif (!$status['running']) {
+            $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
+            $this->doExit(self::STATUS_EXITED, $exitCode);
+        } elseif (!$this->hasExceededTimeLimit()) {
+            $this->pipes->drainBuffers();
+        }
+        
+        return $status;
+    }
+    
+    private function hasExceededTimeLimit()
+    {
+        if ($this->timeLimit && microtime(true) > $this->startTime + $this->timeLimit) {
+            $this->abort(
+                new ProcessAbortedException(
+                    $this,
+                    sprintf('The process exceeded it\'s maximum execution time of %fs and was aborted.', $this->timeLimit)
+                ),
+                $this->timeoutSignal
+            );
+            
+            return true;
+        }
+        
+        return false;
+    }
+    
     private function getStartFn()
     {
-        $resource = &$this->resource;
+        $procResource = &$this->resource;
         $pipes = $this->pipes;
         $status = &$this->status;
         $startTime = &$this->startTime;
-        $that = $this;
+        $pid = &$this->pid;
         
-        return function (array $options) use (&$resource, $pipes, &$status, &$startTime, $that) {
+        return function (array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid) {
             $options[0] = 'exec ' . $options[0];
             $pipeResources = null;
             array_splice($options, 2, 0, array(&$pipeResources));
-            $resource = call_user_func_array('proc_open', $options);
+            $procResource = call_user_func_array('proc_open', $options);
             $pipes->setResources($pipeResources);
             $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
-            $that->getStatus(true);
+            if (false === $procStatus = proc_get_status($procResource)) {
+                throw new \RuntimeException('Failed to start process.');
+            }
+            $pid = $procStatus['pid'];
         };
     }
     
