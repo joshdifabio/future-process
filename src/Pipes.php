@@ -11,7 +11,6 @@ class Pipes
         'write' => array('r', 'r+', 'w+', 'a+', 'x+', 'c+'),
     );
     
-    private $descriptorSpec;
     private $resources = array();
     private $resourcesByType = array(
         'read' => array(),
@@ -22,11 +21,9 @@ class Pipes
         'write' => array(),
     );
     
-    public function __construct(array $config = null)
+    public function __construct(array $descriptorSpec)
     {
-        $this->initDescriptorSpec($config);
-        
-        $pipes = array_filter($this->descriptorSpec, function ($element) {
+        $pipes = array_filter($descriptorSpec, function ($element) {
             return isset($element[0]) && $element[0] === 'pipe';
         });
         
@@ -97,11 +94,6 @@ class Pipes
         $this->drainProcessOutputBuffers($readResources);
     }
     
-    public function getDescriptorSpec()
-    {
-        return $this->descriptorSpec;
-    }
-    
     public function close()
     {
         if ($readResources = $this->resourcesByType['read']) {
@@ -156,19 +148,6 @@ class Pipes
         
         if ($writeResources) {
             $writeResources = array_intersect($this->resources, $writeResources);
-        }
-    }
-    
-    private function initDescriptorSpec($config)
-    {
-        if (null === $config) {
-            $this->descriptorSpec = array(
-                0 => array('pipe', 'r'),
-                1 => array('pipe', 'w'),
-                2 => array('pipe', 'w'),
-            );
-        } else {
-            $this->descriptorSpec = $config;
         }
     }
 }

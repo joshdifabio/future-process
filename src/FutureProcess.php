@@ -15,6 +15,12 @@ class FutureProcess
     const STATUS_ABORTED  = 3;
     const STATUS_UNKNOWN  = 4;
     
+    private static $defaultDescriptorSpec = array(
+        0 => array('pipe', 'r'),
+        1 => array('pipe', 'w'),
+        2 => array('pipe', 'w'),
+    );
+    
     private $promise;
     private $timeLimit;
     private $timeoutSignal;
@@ -37,10 +43,14 @@ class FutureProcess
         $this->timeLimit = $timeLimit;
         $this->timeoutSignal = $timeoutSignal;
         $this->futureExitCode = $futureExitCode;
-        $this->pipes = new Pipes(isset($options[1]) ? $options[1] : null);
+        
+        if (!isset($options[1])) {
+            $options[1] = self::$defaultDescriptorSpec;
+        }
+        
+        $this->pipes = new Pipes($options[1]);
         
         $startFn = $this->getStartFn();
-        $options[1] = $this->pipes->getDescriptorSpec();
         
         if ($this->queueSlot = $queueSlot) {
             $this->status = self::STATUS_QUEUED;
