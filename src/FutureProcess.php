@@ -25,10 +25,6 @@ class FutureProcess
     private $startTime;
     private $pid;
     private $pipes;
-    private $buffers = array(
-        'write' => array(),
-        'read' => array(),
-    );
     private $result;
     
     public function __construct(
@@ -41,9 +37,10 @@ class FutureProcess
         $this->timeLimit = $timeLimit;
         $this->timeoutSignal = $timeoutSignal;
         $this->futureExitCode = $futureExitCode;
+        $this->pipes = new Pipes(isset($options[1]) ? $options[1] : null);
         
         $startFn = $this->getStartFn();
-        $options[1] = $this->prepareDescriptorSpec(isset($options[1]) ? $options[1] : null);
+        $options[1] = $this->pipes->getDescriptorSpec();
         
         if ($this->queueSlot = $queueSlot) {
             $this->status = self::STATUS_QUEUED;
@@ -91,12 +88,7 @@ class FutureProcess
      */
     public function writeToBuffer($descriptor, $data)
     {
-        if (!isset($this->buffers['write'][$descriptor])) {
-            throw new \RuntimeException('No pipe exists for the specified descriptor.');
-        }
-        
-        $this->buffers['write'][$descriptor] .= $data;
-        $this->drainWriteBuffers();
+        $this->pipes->writeToBuffer($descriptor, $data);
     }
     
     /**
@@ -106,16 +98,8 @@ class FutureProcess
     public function readFromBuffer($descriptor)
     {
         $this->wait();
-            
-        if (!isset($this->buffers['read'][$descriptor])) {
-            throw new \RuntimeException('No pipe exists for the specified descriptor.');
-        }
-        
-        $this->drainProcessOutputBuffers();
-        $data = $this->buffers['read'][$descriptor];
-        $this->buffers['read'][$descriptor] = '';
-        
-        return $data;
+
+        return $this->pipes->readFromBuffer($descriptor);
     }
     
     /**
@@ -125,8 +109,7 @@ class FutureProcess
     public function getStatus($refresh = true)
     {
         if ($refresh && $this->status === self::STATUS_RUNNING) {
-            $this->drainWriteBuffers();
-            $this->drainProcessOutputBuffers();
+            $this->pipes->drainBuffers();
             
             if (false === $status = proc_get_status($this->resource)) {
                 $this->doExit(self::STATUS_UNKNOWN, new \RuntimeException('An unknown error occurred.'));
@@ -221,15 +204,17 @@ class FutureProcess
     private function getStartFn()
     {
         $resource = &$this->resource;
-        $pipes = &$this->pipes;
+        $pipes = $this->pipes;
         $status = &$this->status;
         $startTime = &$this->startTime;
         $that = $this;
         
-        return function (array $options) use (&$resource, &$pipes, &$status, &$startTime, $that) {
+        return function (array $options) use (&$resource, $pipes, &$status, &$startTime, $that) {
             $options[0] = 'exec ' . $options[0];
-            array_splice($options, 2, 0, array(&$pipes));
+            $pipeResources = null;
+            array_splice($options, 2, 0, array(&$pipeResources));
             $resource = call_user_func_array('proc_open', $options);
+            $pipes->setResources($pipeResources);
             $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
             $that->getStatus(true);
@@ -240,111 +225,12 @@ class FutureProcess
     {
         $this->status = $status;
         
-        if (null !== $this->pipes) {
-            $this->drainProcessOutputBuffers();
-            foreach ($this->pipes as $pipe) {
-                fclose($pipe);
-            }
-            $this->pipes = null;
-        }
+        $this->pipes->close();
         
         if (is_int($exitCodeOrException)) {
             $this->futureExitCode->resolve($exitCodeOrException);
         } else {
             $this->futureExitCode->reject($exitCodeOrException);
         }
-    }
-    
-    private function prepareDescriptorSpec(array $spec = null)
-    {
-        if (null === $spec) {
-            $spec = array(
-                0 => array('pipe', 'r'),
-                1 => array('pipe', 'w'),
-                2 => array('pipe', 'w'),
-            );
-        }
-        
-        foreach ($spec as $descriptor => $pipe) {
-            if (!isset($pipe[0]) || $pipe[0] !== 'pipe') {
-                continue;
-            }
-            
-            $mode = $pipe[1];
-            if (in_array($mode, array('r', 'r+', 'w+', 'a+', 'x+', 'c+'))) {
-                // this pipe is readable on the child processes end & writable on our end
-                $this->buffers['write'][$descriptor] = '';
-            }
-            
-            if (in_array($mode, array('r+', 'w', 'w+', 'a', 'a+', 'x', 'x+', 'c', 'c+'))) {
-                // this pipe is writable on the child processes end & readable on our end
-                $this->buffers['read'][$descriptor] = '';
-            }
-        }
-        
-        return $spec;
-    }
-    
-    private function drainWriteBuffers()
-    {
-        foreach ($this->getWritablePipes() as $pipe) {
-            // prior PHP 5.4 the array passed to stream_select is modified and
-            // lose key association, we have to find back the key
-            $id = array_search($pipe, $this->pipes);
-            while ($this->buffers['write'][$id]) {
-                $written = fwrite($pipe, $this->buffers['write'][$id], 2 << 18); // write 512k
-                if ($written > 0) {
-                    $this->buffers['write'][$id] = (string)substr($this->buffers['write'][$id], $written);
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-    
-    private function drainProcessOutputBuffers()
-    {
-        foreach ($this->getReadablePipes() as $pipe) {
-            // prior PHP 5.4 the array passed to stream_select is modified and
-            // lose key association, we have to find back the key
-            $id = array_search($pipe, $this->pipes);
-            while ($data = fread($pipe, 8192)) {
-                $this->buffers['read'][$id] .= $data;
-            }
-        }
-    }
-    
-    private function getWritablePipes()
-    {
-        if ($this->status !== self::STATUS_RUNNING || !$this->buffers['write']) {
-            return array();
-        }
-        
-        $read = null;
-        $write = array_intersect_key($this->pipes, $this->buffers['write']);
-        $except = null;
-        
-        if (false === stream_select($read, $write, $except, 0)) {
-            throw new \RuntimeException('An error occurred when polling process pipes.');
-        }
-        
-        return $write;
-    }
-    
-    private function getReadablePipes()
-    {
-        if ($this->status !== self::STATUS_RUNNING || !$this->buffers['read']) {
-            return array();
-        }
-        
-        $read = array_intersect_key($this->pipes, $this->buffers['read']);
-        $write = null;
-        $except = null;
-        
-        if (false === stream_select($read, $write, $except, 0)) {
-            throw new \RuntimeException('An error occurred when polling process pipes.');
-        }
-        
-        return $read;
     }
 }
