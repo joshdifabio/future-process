@@ -63,9 +63,10 @@ class Pipes
             throw new \RuntimeException('No pipe exists for the specified descriptor.');
         }
         
-        $readResources = $this->resourcesByType['read'];
-        $this->select($readResources, $writeResources);
-        $this->drainProcessOutputBuffers($readResources);
+        if ($readResources = $this->resourcesByType['read']) {
+            $this->select($readResources, $writeResources);
+            $this->drainProcessOutputBuffers($readResources);
+        }
         
         $data = $this->buffers['read'][$descriptor];
         $this->buffers['read'][$descriptor] = '';
@@ -81,9 +82,10 @@ class Pipes
         
         $this->buffers['write'][$descriptor] .= $data;
         
-        $writeResources = $this->resourcesByType['write'];
-        $this->select($readResources, $writeResources);
-        $this->drainWriteBuffers($writeResources);
+        if ($writeResources = $this->resourcesByType['write']) {
+            $this->select($readResources, $writeResources);
+            $this->drainWriteBuffers($writeResources);
+        }
     }
     
     public function drainBuffers()
@@ -102,9 +104,10 @@ class Pipes
     
     public function close()
     {
-        $readResources = $this->resourcesByType['read'];
-        $this->select($readResources, $writeResources);
-        $this->drainProcessOutputBuffers($readResources);
+        if ($readResources = $this->resourcesByType['read']) {
+            $this->select($readResources, $writeResources);
+            $this->drainProcessOutputBuffers($readResources);
+        }
         
         foreach ($this->resources as $descriptor => $resource) {
             fclose($resource);
@@ -140,23 +143,17 @@ class Pipes
     
     private function select(&$readResources, &$writeResources)
     {
-        if (!$readResources && !$writeResources) {
-            return;
-        }
-        
-        if (false === $ready = stream_select($readResources, $writeResources, $except, 0)) {
+        if (false === stream_select($readResources, $writeResources, $except, 0)) {
             throw new \RuntimeException('An error occurred when polling process pipes.');
-        }
-        
-        if (!$ready) {
-            return;
         }
         
         // prior PHP 5.4 the array passed to stream_select is modified and
         // lose key association, we have to find back the key
+        
         if ($readResources) {
             $readResources = array_intersect($this->resources, $readResources);
         }
+        
         if ($writeResources) {
             $writeResources = array_intersect($this->resources, $writeResources);
         }
