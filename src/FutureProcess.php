@@ -89,7 +89,7 @@ class FutureProcess
     {
         $this->wait();
             
-        return !array_key_exists($descriptor, $this->pipes) ? null : $this->pipes[$descriptor];
+        return $this->pipes->getResource($descriptor);
     }
     
     /**
