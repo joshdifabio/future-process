@@ -18,19 +18,42 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
-    public function testWriteToStdin()
+    public function testReadFromPipeAndBuffer()
     {
         $shell = new Shell;
-        $process = $shell->startProcess(
-            "{$this->phpExecutablePath} -r "
-            . escapeshellarg(implode("\n", array(
-                '$stdin = fopen("php://stdin", "r");',
-                'echo fread($stdin, 20);',
-            )))
-        );
-        $process->then(function ($process) {
-            $process->writeToBuffer(0, "Hello world!\n");
-        });
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('echo "Hello world!"; usleep(100000); echo "Goodbye world!";')
+        ));
+        
+        $this->assertSame('Hello world!', fread($process->getPipe(1), 20));
+        $this->assertSame(0, $process->getResult()->getExitCode());
+        $this->assertSame('Goodbye world!', $process->readFromBuffer(1));
+        $this->assertSame('', $process->getResult()->readFromBuffer(1));
+    }
+    
+    public function testReadFromPipe()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('usleep(100000); echo "Hello world!";')
+        ));
+        
+        $this->assertSame('Hello world!', fread($process->getPipe(1), 20));
+    }
+    
+    public function testWriteToPipe()
+    {
+        $shell = new Shell;
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
+        ));
+        
+        fwrite($process->getPipe(0), "Hello world!\n");
         
         $result = $process->getResult()->wait(0.5);
         
@@ -38,7 +61,23 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame("Hello world!\n", $result->readFromBuffer(1));
     }
     
-    public function testWriteEmptyToStdin()
+    public function testWriteToStdin()
+    {
+        $shell = new Shell;
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
+        ));
+        
+        $process->writeToBuffer(0, "Hello world!\n");
+        
+        $result = $process->getResult()->wait(0.5);
+        
+        $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
+        $this->assertSame("Hello world!\n", $result->readFromBuffer(1));
+    }
+    
+    public function testWriteEmptyStringToStdin()
     {
         $shell = new Shell;
         $process = $shell->startProcess(
