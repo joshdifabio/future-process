@@ -18,6 +18,51 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
+    public function testLateAbort()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('echo "Hello world!";')
+        ));
+        
+        $process->getResult()->wait(0.5);
+        $process->abort(new \Exception);
+        $process->wait(0);
+        $process->getResult()->wait(0); // ensure no Exception is thrown
+        $this->assertSame(FutureProcess::STATUS_EXITED, $process->getStatus(false));
+        
+        $that = $this;
+        $process->then(null, function () use ($that) {
+            $that->fail();
+        });
+        $process->getResult()->then(null, function () use ($that) {
+            $that->fail();
+        });
+    }
+    
+    public function testRepeatAbort()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
+        ));
+        
+        $process->wait(0.1);
+        $process->abort(new \Exception(null, 1));
+        $process->abort(new \Exception(null, 2));
+        
+        try {
+            $process->getResult()->wait(0);
+            $this->fail();
+        } catch (\Exception $e) {
+            $this->assertSame(1, $e->getCode());
+        }
+    }
+    
     public function testProcessGetPipeDescriptorValidation()
     {
         $shell = new Shell;
