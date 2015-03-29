@@ -26,18 +26,11 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->phpExecutablePath,
             escapeshellarg(
                 '$stdin = fopen("php://stdin", "r");' .
-                '$read = array($stdin);' .
-                'stream_select($read, $write, $except, 1);' .
-                'stream_set_blocking($stdin, 0);' .
-                'while (true) {' .
-                    'if (!strlen($data = fread($stdin, 2 << 18))) {' .
-                        'usleep(10000);' .
-                        'if (!strlen($data = fread($stdin, 2 << 18))) {' .
-                            'break;' .
-                        '}' .
-                    '}' .
-                    'echo $data;' .
-                '}'
+                '$data = "";' .
+                'while (strlen($data) < 10000000) {' .
+                    '$data .= fread($stdin, 2 << 18);' .
+                '}' .
+                'echo $data;'
             )
         ));
         
