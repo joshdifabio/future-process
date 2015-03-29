@@ -18,6 +18,26 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
+    public function testWriteToStdin()
+    {
+        $shell = new Shell;
+        $process = $shell->startProcess(
+            "{$this->phpExecutablePath} -r "
+            . escapeshellarg(implode("\n", array(
+                '$stdin = fopen("php://stdin", "r");',
+                'echo fread($stdin, 20);',
+            )))
+        );
+        $process->then(function ($process) {
+            $process->writeToBuffer(0, "Hello world!\n");
+        });
+        
+        $result = $process->getResult()->wait(0.5);
+        
+        $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
+        $this->assertSame("Hello world!\n", $result->readFromBuffer(1));
+    }
+    
     public function testAbortRunningProcess()
     {
         $shell = new Shell;
