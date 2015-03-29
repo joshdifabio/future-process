@@ -112,7 +112,7 @@ class Pipes
     private function drainProcessOutputBuffers(array $resources)
     {
         foreach ($resources as $descriptor => $resource) {
-            while ($data = fread($resource, 8192)) {
+            while (strlen($data = fread($resource, 8192))) {
                 $this->buffers['read'][$descriptor] .= $data;
             }
         }
