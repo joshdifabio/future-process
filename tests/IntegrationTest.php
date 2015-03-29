@@ -18,6 +18,40 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
+    public function testProcessGetPipeDescriptorValidation()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg('usleep(100000); echo "Hello world!";')
+        ));
+        
+        $process->writeToBuffer(0, 'Hello!');
+        try {
+            $process->writeToBuffer(5, 'Hello!');
+            $this->fail();
+        } catch (\RuntimeException $e) {
+            
+        }
+        
+        $process->readFromBuffer(1);
+        try {
+            $process->readFromBuffer(5);
+            $this->fail();
+        } catch (\RuntimeException $e) {
+            
+        }
+        
+        $process->getPipe(1);
+        try {
+            $process->getPipe(5);
+            $this->fail();
+        } catch (\RuntimeException $e) {
+            
+        }
+    }
+    
     public function testReadFromPipeAndBuffer()
     {
         $shell = new Shell;
