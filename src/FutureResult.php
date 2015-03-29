@@ -8,13 +8,13 @@ use React\Promise\PromiseInterface;
  */
 class FutureResult
 {
-    private $process;
+    private $pipes;
     private $futureExitCode;
     private $promise;
     
-    public function __construct(FutureProcess $process, FutureValue $futureExitCode)
+    public function __construct(Pipes $pipes, FutureValue $futureExitCode)
     {
-        $this->process = $process;
+        $this->pipes = $pipes;
         $this->futureExitCode = $futureExitCode;
     }
     
@@ -26,7 +26,7 @@ class FutureResult
     {
         $this->wait();
         
-        return $this->process->readFromBuffer($descriptor);
+        return $this->pipes->readFromBuffer($descriptor);
     }
     
     /**

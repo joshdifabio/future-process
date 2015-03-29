@@ -131,7 +131,7 @@ class FutureProcess
     public function getResult()
     {
         if (is_null($this->result)) {
-            $this->result = new FutureResult($this, $this->futureExitCode);
+            $this->result = new FutureResult($this->pipes, $this->futureExitCode);
         }
         
         return $this->result;
