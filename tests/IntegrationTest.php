@@ -34,10 +34,10 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_EXITED, $process->getStatus(false));
         
         $that = $this;
-        $process->then(null, function () use ($that) {
+        $process->promise()->then(null, function () use ($that) {
             $that->fail();
         });
-        $process->getResult()->then(null, function () use ($that) {
+        $process->getResult()->promise()->then(null, function () use ($that) {
             $that->fail();
         });
     }
@@ -166,7 +166,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
                 'echo fread($stdin, 20);',
             )))
         );
-        $process->then(function ($process) {
+        $process->promise()->then(function ($process) {
             $process->writeToBuffer(0, '0');
         });
         
@@ -210,7 +210,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertTrue($processPromiseResolved);
         
         $resultPromiseRejected = false;
-        $process->getResult()->then(
+        $process->getResult()->promise()->then(
             function () use ($that) {
                 $that->fail();
             },
