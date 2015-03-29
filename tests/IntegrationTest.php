@@ -18,6 +18,35 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->phpExecutablePath = $finder->find();
     }
     
+    public function testLargeIO()
+    {
+        $shell = new Shell;
+        
+        $process = $shell->startProcess(sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg(
+                '$stdin = fopen("php://stdin", "r");' .
+                '$read = array($stdin);' .
+                'stream_select($read, $write, $except, 1);' .
+                'stream_set_blocking($stdin, 0);' .
+                'while (true) {' .
+                    'if (!strlen($data = fread($stdin, 2 << 18))) {' .
+                        'usleep(10000);' .
+                        'if (!strlen($data = fread($stdin, 2 << 18))) {' .
+                            'break;' .
+                        '}' .
+                    '}' .
+                    'echo $data;' .
+                '}'
+            )
+        ));
+        
+        $process->writeToBuffer(0, str_repeat("X", 10000000));
+        $process->getResult()->wait(5);
+        $this->assertSame(0, $process->getResult()->getExitCode());
+        $this->assertSame(10000000, strlen($process->readFromBuffer(1)));
+    }
+    
     public function testLateAbort()
     {
         $shell = new Shell;

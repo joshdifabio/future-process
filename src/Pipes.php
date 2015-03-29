@@ -112,6 +112,7 @@ class Pipes
     private function drainProcessOutputBuffers(array $resources)
     {
         foreach ($resources as $descriptor => $resource) {
+            stream_set_blocking($resource, 0);
             while (strlen($data = fread($resource, 8192))) {
                 $this->buffers['read'][$descriptor] .= $data;
             }
@@ -121,6 +122,7 @@ class Pipes
     private function drainWriteBuffers(array $resources)
     {
         foreach ($resources as $descriptor => $resource) {
+            stream_set_blocking($resource, 0);
             $descriptor = array_search($resource, $this->resourcesByType);
             while (strlen($this->buffers['write'][$descriptor])) {
                 $written = fwrite($resource, $this->buffers['write'][$descriptor], 2 << 18); // write 512k
