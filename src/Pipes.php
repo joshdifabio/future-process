@@ -142,11 +142,11 @@ class Pipes
         // prior PHP 5.4 the array passed to stream_select is modified and
         // lose key association, we have to find back the key
         
-        if ($readResources) {
+        if (count($readResources)) {
             $readResources = array_intersect($this->resources, $readResources);
         }
         
-        if ($writeResources) {
+        if (count($writeResources)) {
             $writeResources = array_intersect($this->resources, $writeResources);
         }
     }
