@@ -122,7 +122,7 @@ class Pipes
     {
         foreach ($resources as $descriptor => $resource) {
             $descriptor = array_search($resource, $this->resourcesByType);
-            while ($this->buffers['write'][$descriptor]) {
+            while (strlen($this->buffers['write'][$descriptor])) {
                 $written = fwrite($resource, $this->buffers['write'][$descriptor], 2 << 18); // write 512k
                 if ($written > 0) {
                     $this->buffers['write'][$descriptor] = (string)substr($this->buffers['write'][$descriptor], $written);
