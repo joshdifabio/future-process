@@ -13,7 +13,7 @@ class FutureProcess
     const STATUS_RUNNING  = 1;
     const STATUS_EXITED   = 2;
     const STATUS_ABORTED  = 3;
-    const STATUS_UNKNOWN  = 4;
+    const STATUS_ERROR    = 4;
     
     private static $defaultOptions;
     
@@ -187,7 +187,7 @@ class FutureProcess
     private function refreshStatus()
     {
         if (false === $status = proc_get_status($this->resource)) {
-            $this->doExit(self::STATUS_UNKNOWN, new \RuntimeException('An unknown error occurred.'));
+            $this->doExit(self::STATUS_ERROR, new \RuntimeException('An unknown error occurred.'));
         } elseif (!$status['running']) {
             $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
             $this->doExit(self::STATUS_EXITED, $exitCode);
