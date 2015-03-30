@@ -159,7 +159,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             escapeshellarg('echo "Hello world!";')
         ));
         
-        $process->getResult()->wait(0.5);
+        $process->getResult()->wait(2);
         $process->abort(new Exception);
         $process->wait(0);
         $process->getResult()->wait(0); // ensure no Exception is thrown
