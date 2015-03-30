@@ -439,6 +439,70 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(3)->getStatus());
     }
     
+    public function testAwaitShell()
+    {
+        $shell = new Shell;
+        $shell->setProcessLimit(2);
+        
+        $command = sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg(
+                'usleep(100000);' .
+                'echo "Hello world!";'
+            )
+        );
+        
+        $processes = array();
+        
+        for ($i = 0; $i < 4; $i++) {
+            $processes[$i] = $shell->startProcess($command);
+        }
+        
+        $shell->wait(5);
+        
+        foreach ($processes as $process) {
+            $this->assertSame(FutureProcess::STATUS_EXITED, $process->getStatus(false));
+            $this->assertSame('Hello world!', $process->readFromBuffer(1));
+        }
+    }
+    
+    public function testShellTimeout()
+    {
+        $shell = new Shell;
+        $shell->setProcessLimit(1);
+        
+        $command1 = sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg(
+                'echo "Hello world!";'
+            )
+        );
+        
+        $command2 = sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg(
+                'sleep(5);' .
+                'echo "Hello world!";'
+            )
+        );
+        
+        $process1 = $shell->startProcess($command1);
+        $process2 = $shell->startProcess($command2);
+        
+        try {
+            $shell->wait(0.5);
+            $this->fail('The expected exception was not thrown');
+        } catch (TimeoutException $e) {
+            
+        }
+        
+        $this->assertSame(FutureProcess::STATUS_EXITED, $process1->getStatus(false));
+        $this->assertSame('Hello world!', $process1->readFromBuffer(1));
+        
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process2->getStatus(false));
+        $process2->abort();
+    }
+    
     public function testGetPid()
     {
         $shell = new Shell;
