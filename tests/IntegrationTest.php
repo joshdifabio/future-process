@@ -60,7 +60,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         try {
             $process->getResult()->wait(1);
             $this->fail();
-        } catch (ProcessAbortedException $e) {
+        } catch (\Exception $e) {
             
         }
         
@@ -308,7 +308,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $shell = new Shell;
         $process = $shell->startProcess($this->phpSleepCommand(0.5));
         
-        $thrown = new ProcessAbortedException($process);
+        $thrown = new \Exception;
         $process->then(function ($process) use ($thrown) {
             $process->abort($thrown);
         });
@@ -318,7 +318,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         try {
             $process->getResult()->wait(1);
             $this->fail('Expected Exception was not thrown');
-        } catch (ProcessAbortedException $caught) {
+        } catch (\Exception $caught) {
             $this->assertSame($thrown, $caught);
         }
         
@@ -358,20 +358,20 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
         
-        $thrown = new ProcessAbortedException($process2);
+        $thrown = new \Exception;
         $process2->abort($thrown);
         
         try {
             $process2->wait(0);
             $this->fail('Expected Exception was not thrown');
-        } catch (ProcessAbortedException $caught) {
+        } catch (\Exception $caught) {
             $this->assertSame($thrown, $caught);
         }
         
         try {
             $process2->getResult()->wait(0);
             $this->fail('Expected Exception was not thrown');
-        } catch (ProcessAbortedException $caught) {
+        } catch (\Exception $caught) {
             $this->assertSame($thrown, $caught);
         }
         

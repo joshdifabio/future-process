@@ -212,8 +212,7 @@ class FutureProcess
     {
         if ($this->timeLimit && microtime(true) > $this->startTime + $this->timeLimit) {
             $this->abort(
-                new ProcessAbortedException(
-                    $this,
+                new \RuntimeException(
                     sprintf('The process exceeded it\'s maximum execution time of %fs and was aborted.', $this->timeLimit)
                 ),
                 $this->timeoutSignal
