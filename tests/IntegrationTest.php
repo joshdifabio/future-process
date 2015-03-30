@@ -48,11 +48,12 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->phpExecutablePath,
             escapeshellarg(
                 'echo "Hello world!";' .
-                'sleep(1);'
+                'sleep(1);' .
+                'echo "Goodbye world!";'
             )
         );
         
-        $process = $shell->startProcess($command, null, null, null, null, 0.1);
+        $process = $shell->startProcess($command, null, null, null, null, 0.5);
         
         $process->wait(1);
         
@@ -63,7 +64,85 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             
         }
         
+        $process->wait(1);
+        
         $this->assertSame('Hello world!', $process->readFromBuffer(1));
+    }
+    
+    public function testQuietlyAbortRunningProcess()
+    {
+        $shell = new Shell;
+        $process = $shell->startProcess($this->phpSleepCommand(0.5));
+        
+        $process->then(function ($process) {
+            $process->abort();
+        });
+        
+        $process->wait(0.5); // this should not error
+        $process->getResult()->wait(1); // this should not error
+        $process->wait(0); // this should not error
+        
+        $that = $this;
+        $processPromiseResolved = false;
+        $process->then(
+            function () use (&$processPromiseResolved) {
+                $processPromiseResolved = true;
+            },
+            function () use ($that) {
+                $that->fail();
+            }
+        );
+        $this->assertTrue($processPromiseResolved);
+        
+        $processPromiseResolved = false;
+        $process->then(
+            function () use (&$processPromiseResolved) {
+                $processPromiseResolved = true;
+            },
+            function () use ($that) {
+                $that->fail();
+            }
+        );
+        $this->assertTrue($processPromiseResolved);
+    }
+    
+    public function testQuietlyAbortQueuedProcess()
+    {
+        $shell = new Shell;
+        $shell->setProcessLimit(1);
+        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
+        
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
+        $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
+        
+        $process2->abort();
+        
+        $process2->wait(0);
+        $process2->getResult()->wait(0);
+        
+        $that = $this;
+        $processPromiseResolved = false;
+        $process2->then(
+            function () use (&$processPromiseResolved) {
+                $processPromiseResolved = true;
+            },
+            function () use ($that) {
+                $that->fail();
+            }
+        );
+        $this->assertTrue($processPromiseResolved);
+        
+        $processPromiseResolved = false;
+        $process2->then(
+            function () use (&$processPromiseResolved) {
+                $processPromiseResolved = true;
+            },
+            function () use ($that) {
+                $that->fail();
+            }
+        );
+        $this->assertTrue($processPromiseResolved);
     }
     
     public function testLateAbort()

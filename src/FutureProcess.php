@@ -138,22 +138,26 @@ class FutureProcess
     }
     
     /**
-     * @param \Exception $e
+     * @param \Exception|null $error
      * @param int|null $signal If null is passed, no signal will be sent to the process
      */
-    public function abort(\Exception $e, $signal = 15)
+    public function abort(\Exception $error = null, $signal = 15)
     {
         if ($this->status === self::STATUS_RUNNING) {
             if (null !== $signal) {
                 proc_terminate($this->resource, $signal);
             }
         } elseif ($this->status === self::STATUS_QUEUED) {
-            $this->queueSlot->reject($e);
+            if ($error) {
+                $this->queueSlot->reject($error);
+            } else {
+                $this->queueSlot->resolve();
+            }
         } else {
             return;
         }
         
-        $this->doExit(self::STATUS_ABORTED, $e);
+        $this->doExit(self::STATUS_ABORTED, $error);
     }
     
     /**
@@ -250,10 +254,10 @@ class FutureProcess
         
         $this->pipes->close();
         
-        if (is_int($exitCodeOrException)) {
-            $this->futureExitCode->resolve($exitCodeOrException);
-        } else {
+        if ($exitCodeOrException instanceof \Exception) {
             $this->futureExitCode->reject($exitCodeOrException);
+        } else {
+            $this->futureExitCode->resolve($exitCodeOrException);
         }
     }
 }
