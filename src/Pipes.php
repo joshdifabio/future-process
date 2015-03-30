@@ -85,7 +85,7 @@ class Pipes
         }
     }
     
-    public function drainBuffers()
+    public function readAndWrite()
     {
         $readResources = $this->resourcesByType['read'];
         $writeResources = $this->resourcesByType['write'];

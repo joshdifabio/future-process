@@ -192,7 +192,7 @@ class FutureProcess
             $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
             $this->doExit(self::STATUS_EXITED, $exitCode);
         } elseif (!$this->hasExceededTimeLimit()) {
-            $this->pipes->drainBuffers();
+            $this->pipes->readAndWrite();
         }
         
         return $status;
