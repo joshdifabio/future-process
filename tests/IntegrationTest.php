@@ -266,7 +266,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         fwrite($process->getPipe(0), "Hello world!\n");
         
-        $result = $process->getResult()->wait(0.5);
+        $result = $process->getResult()->wait(2);
         
         $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
         $this->assertSame("Hello world!\n", $result->readFromBuffer(1));
@@ -282,7 +282,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $process->writeToBuffer(0, "Hello world!\n");
         
-        $result = $process->getResult()->wait(0.5);
+        $result = $process->getResult()->wait(2);
         
         $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
         $this->assertSame("Hello world!\n", $result->readFromBuffer(1));
@@ -302,7 +302,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $process->writeToBuffer(0, '0');
         });
         
-        $result = $process->getResult()->wait(0.5);
+        $result = $process->getResult()->wait(2);
         
         $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
         $this->assertSame('0', $result->readFromBuffer(1));
