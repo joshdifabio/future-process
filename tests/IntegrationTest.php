@@ -48,7 +48,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->phpExecutablePath,
             escapeshellarg(
                 'echo "Hello world!";' .
-                'usleep(200000);' .
+                'sleep(1);' .
                 'echo "Goodbye world!";'
             )
         );
@@ -56,7 +56,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $thrown = new Exception;
         
         $process = $shell->startProcess($command, array(
-            'timeout' => 0.1,
+            'timeout' => 0.5,
             'timeout_error' => $thrown,
         ));
         
