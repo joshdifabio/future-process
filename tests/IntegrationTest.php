@@ -431,7 +431,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process2->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process3->getStatus());
         
-        $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(1)->getStatus());
+        $this->assertSame(FutureProcess::STATUS_RUNNING, $process3->wait(3)->getStatus());
     }
     
     public function testGetPid()
