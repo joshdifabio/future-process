@@ -40,6 +40,32 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(10000000, strlen($process->readFromBuffer(1)));
     }
     
+    public function testProcessTimeLimitExceeded()
+    {
+        $shell = new Shell;
+        
+        $command = sprintf('%s -r %s',
+            $this->phpExecutablePath,
+            escapeshellarg(
+                'echo "Hello world!";' .
+                'sleep(1);'
+            )
+        );
+        
+        $process = $shell->startProcess($command, null, null, null, null, 0.1);
+        
+        $process->wait(1);
+        
+        try {
+            $process->getResult()->wait(1);
+            $this->fail();
+        } catch (ProcessAbortedException $e) {
+            
+        }
+        
+        $this->assertSame('Hello world!', $process->readFromBuffer(1));
+    }
+    
     public function testLateAbort()
     {
         $shell = new Shell;
