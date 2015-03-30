@@ -25,23 +25,12 @@ class Shell
     /**
      * @return FutureProcess
      */
-    public function startProcess(
-        $command,
-        array $descriptorSpec = null,
-        $workingDirectory = null,
-        array $environmentVariables = null,
-        array $otherOptions = null,
-        $timeLimit = null,
-        $timeoutSignal = 15
-    ) {
+    public function startProcess($command, array $options = array())
+    {
         $handleQueueFn = $this->handleQueueFn;
         $handleQueueFn();
         
-        $process = $this->createProcess(
-            array_slice(func_get_args(), 0, 5),
-            $timeLimit,
-            $timeoutSignal
-        );
+        $process = $this->createProcess($command, $options);
 
         $activeProcesses = $this->activeProcesses;
         $process->then(function () use ($activeProcesses, $process) {
@@ -97,17 +86,17 @@ class Shell
         }
     }
     
-    private function createProcess($options, $timeLimit, $timeoutSignal)
+    private function createProcess($command, array $options)
     {
         $futureExitCode = new FutureValue($this->runUntilFutureRealisedFn);
         
         $canStartProcessFn = $this->canStartProcessFn;
         if (!$canStartProcessFn()) {
             $queueSlot = new FutureValue($this->runUntilFutureRealisedFn);
-            $process = new FutureProcess($options, $timeLimit, $timeoutSignal, $futureExitCode, $queueSlot);
+            $process = new FutureProcess($command, $options, $futureExitCode, $queueSlot);
             $this->queue->enqueue($queueSlot);
         } else {
-            $process = new FutureProcess($options, $timeLimit, $timeoutSignal, $futureExitCode);
+            $process = new FutureProcess($command, $options, $futureExitCode);
         }
         
         return $process;

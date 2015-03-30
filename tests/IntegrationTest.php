@@ -48,20 +48,25 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->phpExecutablePath,
             escapeshellarg(
                 'echo "Hello world!";' .
-                'sleep(1);' .
+                'usleep(200000);' .
                 'echo "Goodbye world!";'
             )
         );
         
-        $process = $shell->startProcess($command, null, null, null, null, 0.5);
+        $thrown = new Exception;
+        
+        $process = $shell->startProcess($command, array(
+            'timeout' => 0.1,
+            'timeout_error' => $thrown,
+        ));
         
         $process->wait(1);
         
         try {
-            $process->getResult()->wait(1);
-            $this->fail();
-        } catch (\Exception $e) {
-            
+            $process->getResult()->wait(2);
+            $this->fail('The expected exception was not thrown');
+        } catch (Exception $caught) {
+            $this->assertSame($thrown, $caught);
         }
         
         $process->wait(1);
@@ -155,7 +160,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         ));
         
         $process->getResult()->wait(0.5);
-        $process->abort(new \Exception);
+        $process->abort(new Exception);
         $process->wait(0);
         $process->getResult()->wait(0); // ensure no Exception is thrown
         $this->assertSame(FutureProcess::STATUS_EXITED, $process->getStatus(false));
@@ -179,13 +184,13 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         ));
         
         $process->wait(0.1);
-        $process->abort(new \Exception(null, 1));
-        $process->abort(new \Exception(null, 2));
+        $process->abort(new Exception(null, 1));
+        $process->abort(new Exception(null, 2));
         
         try {
             $process->getResult()->wait(0);
-            $this->fail();
-        } catch (\Exception $e) {
+            $this->fail('The expected exception was not thrown');
+        } catch (Exception $e) {
             $this->assertSame(1, $e->getCode());
         }
     }
@@ -202,7 +207,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $process->writeToBuffer(0, 'Hello!');
         try {
             $process->writeToBuffer(5, 'Hello!');
-            $this->fail();
+            $this->fail('The expected exception was not thrown');
         } catch (\RuntimeException $e) {
             
         }
@@ -210,7 +215,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $process->readFromBuffer(1);
         try {
             $process->readFromBuffer(5);
-            $this->fail();
+            $this->fail('The expected exception was not thrown');
         } catch (\RuntimeException $e) {
             
         }
@@ -218,7 +223,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $process->getPipe(1);
         try {
             $process->getPipe(5);
-            $this->fail();
+            $this->fail('The expected exception was not thrown');
         } catch (\RuntimeException $e) {
             
         }
@@ -308,7 +313,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $shell = new Shell;
         $process = $shell->startProcess($this->phpSleepCommand(0.5));
         
-        $thrown = new \Exception;
+        $thrown = new Exception;
         $process->then(function ($process) use ($thrown) {
             $process->abort($thrown);
         });
@@ -358,13 +363,13 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
         
-        $thrown = new \Exception;
+        $thrown = new Exception;
         $process2->abort($thrown);
         
         try {
             $process2->wait(0);
             $this->fail('Expected Exception was not thrown');
-        } catch (\Exception $caught) {
+        } catch (Exception $caught) {
             $this->assertSame($thrown, $caught);
         }
         
@@ -497,4 +502,9 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         return "{$this->phpExecutablePath} -r \"usleep($microSeconds);\"";
     }
+}
+
+class Exception extends \Exception
+{
+    
 }

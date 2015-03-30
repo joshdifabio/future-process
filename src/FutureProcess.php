@@ -15,15 +15,10 @@ class FutureProcess
     const STATUS_ABORTED  = 3;
     const STATUS_UNKNOWN  = 4;
     
-    private static $defaultDescriptorSpec = array(
-        0 => array('pipe', 'r'),
-        1 => array('pipe', 'w'),
-        2 => array('pipe', 'w'),
-    );
+    private static $defaultOptions;
     
     private $promise;
-    private $timeLimit;
-    private $timeoutSignal;
+    private $options;
     private $futureExitCode;
     private $queueSlot;
     private $status;
@@ -34,21 +29,16 @@ class FutureProcess
     private $result;
     
     public function __construct(
+        $command,
         array $options,
-        $timeLimit,
-        $timeoutSignal,
         FutureValue $futureExitCode,
         FutureValue $queueSlot = null
     ) {
-        $this->timeLimit = $timeLimit;
-        $this->timeoutSignal = $timeoutSignal;
+        $options = $this->prepareOptions($options);
+        
+        $this->options = $options;
         $this->futureExitCode = $futureExitCode;
-        
-        if (!isset($options[1])) {
-            $options[1] = self::$defaultDescriptorSpec;
-        }
-        
-        $this->pipes = new Pipes($options[1]);
+        $this->pipes = new Pipes($options['io']);
         
         $startFn = $this->getStartFn();
         
@@ -56,8 +46,8 @@ class FutureProcess
             $this->status = self::STATUS_QUEUED;
             $that = $this;
             $this->promise = $queueSlot->then(
-                function () use ($startFn, $options, $that) {
-                    $startFn($options);
+                function () use ($startFn, $command, $options, $that) {
+                    $startFn($command, $options);
                     return $that;
                 },
                 function (\Exception $e) use ($that) {
@@ -66,7 +56,7 @@ class FutureProcess
                 }
             );
         } else {
-            $startFn($options);
+            $startFn($command, $options);
             $this->promise = new FulfilledPromise($this);
         }
     }
@@ -210,18 +200,44 @@ class FutureProcess
     
     private function hasExceededTimeLimit()
     {
-        if ($this->timeLimit && microtime(true) > $this->startTime + $this->timeLimit) {
+        if ($this->options['timeout'] && microtime(true) > $this->startTime + $this->options['timeout']) {
             $this->abort(
-                new \RuntimeException(
-                    sprintf('The process exceeded it\'s maximum execution time of %fs and was aborted.', $this->timeLimit)
-                ),
-                $this->timeoutSignal
+                $this->options['timeout_error'],
+                $this->options['timeout_signal']
             );
             
             return true;
         }
         
         return false;
+    }
+    
+    private static function prepareOptions(array $options)
+    {
+        return array_merge(
+            self::getDefaultOptions(),
+            $options
+        );
+    }
+    
+    private static function getDefaultOptions()
+    {
+        if (is_null(self::$defaultOptions)) {
+            self::$defaultOptions = array(
+                'io' => array(
+                    0 => array('pipe', 'r'),
+                    1 => array('pipe', 'w'),
+                    2 => array('pipe', 'w'),
+                ),
+                'working_dir' => null,
+                'environment' => null,
+                'timeout' => null,
+                'timeout_signal' => 15,
+                'timeout_error' => new \RuntimeException('The process exceeded its time limit and was aborted.'),
+            );
+        }
+        
+        return self::$defaultOptions;
     }
     
     private function getStartFn()
@@ -232,11 +248,14 @@ class FutureProcess
         $startTime = &$this->startTime;
         $pid = &$this->pid;
         
-        return function (array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid) {
-            $options[0] = 'exec ' . $options[0];
-            $pipeResources = null;
-            array_splice($options, 2, 0, array(&$pipeResources));
-            $procResource = call_user_func_array('proc_open', $options);
+        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid) {
+            $procResource = proc_open(
+                "exec $command",
+                $options['io'],
+                $pipeResources,
+                $options['working_dir'],
+                $options['environment']
+            );
             $pipes->setResources($pipeResources);
             $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
