@@ -30,7 +30,7 @@ class FutureResult
     }
     
     /**
-     * @return int
+     * @return null|int
      */
     public function getExitCode()
     {
