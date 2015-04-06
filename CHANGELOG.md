@@ -5,15 +5,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## [0.2.0] - 2015-04-06
 ### Added
 - Automatic buffering of child process i/o to prevent child processes becoming blocked by filled output buffers.
-- Moved i/o functionality into new Pipes class to reduce complexity of FutureProcess class.
 - Process timeout functionality.
 - Support for PHP 7.0 and HHVM.
 
 ### Changed
 - Replaced FutureProcess::kill() and detach() with abort().
 - Shell::startProcess() args changed to (string $commandLine, array $options = []).
+- Moved i/o functionality into new Pipes class to reduce complexity of FutureProcess class.
 
-## [0.1.0] - 2015-03-01
+## 0.1.0 - 2015-03-01
 ### Added
 - Shell class for parallel execution of command lines with automatic queueing of commands.
 - FutureProcess and FutureResult classes for mixed asynchronous and synchronous interfaces to child processes.
