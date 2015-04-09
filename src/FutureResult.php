@@ -27,7 +27,7 @@ class FutureResult
     {
         $this->wait();
         
-        return $this->pipes->readFromBuffer($descriptor, $length);
+        return $this->pipes->read($descriptor, $length);
     }
     
     /**
