@@ -93,13 +93,14 @@ class FutureProcess
     
     /**
      * @param int $descriptor
+     * @param int|null $length
      * @return string
      */
-    public function readFromBuffer($descriptor)
+    public function readFromBuffer($descriptor, $length = null)
     {
         $this->wait();
 
-        return $this->pipes->readFromBuffer($descriptor);
+        return $this->pipes->readFromBuffer($descriptor, $length);
     }
     
     /**
