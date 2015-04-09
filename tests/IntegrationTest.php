@@ -403,6 +403,19 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $this->assertSame('Hello World', $result->readFromBuffer(1));
     }
     
+    public function testPartiallyDrainReadBuffer()
+    {
+        $shell = new Shell;
+        $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
+        $process = $shell->startProcess($command);
+        $result = $process->getResult()->wait(2);
+        
+        $this->assertSame(0, $result->getExitCode(), $result->readFromBuffer(2));
+        $this->assertSame('Hello', $result->readFromBuffer(1, 5));
+        $this->assertSame(' Wo', $process->readFromBuffer(1, 3));
+        $this->assertSame('rld', $result->readFromBuffer(1, 3));
+    }
+    
     public function testExecuteCommandWithTimeout()
     {
         $shell = new Shell;

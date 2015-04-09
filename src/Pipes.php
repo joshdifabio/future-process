@@ -54,7 +54,7 @@ class Pipes
         return $this->resources[$descriptor];
     }
     
-    public function readFromBuffer($descriptor)
+    public function readFromBuffer($descriptor, $length = null)
     {
         if (!isset($this->buffers['read'][$descriptor])) {
             throw new \RuntimeException('No pipe exists for the specified descriptor.');
@@ -65,8 +65,13 @@ class Pipes
             $this->drainProcessOutputBuffers($readResources);
         }
         
-        $data = $this->buffers['read'][$descriptor];
-        $this->buffers['read'][$descriptor] = '';
+        if (is_int($length)) {
+            $data = substr($this->buffers['read'][$descriptor], 0, $length);
+            $this->buffers['read'][$descriptor] = substr($this->buffers['read'][$descriptor], $length);
+        } else {
+            $data = $this->buffers['read'][$descriptor];
+            $this->buffers['read'][$descriptor] = '';
+        }
         
         return $data;
     }
