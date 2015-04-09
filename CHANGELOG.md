@@ -4,10 +4,13 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
-- Optional $length parameter to readFromPipe() methods to avoid fully draining buffers.
+- Add optional `$length` param to `readFromPipe()` methods to allow reading pipe without fully draining buffer.
 
 ### Changed
-- Renamed readFromBuffer() and writeToBuffer() methods to readFromPipe() and writeToPipe() respectively.
+- Rename `readFromBuffer()` and `writeToBuffer()` methods to `readFromPipe()` and `writeToPipe()` respectively.
+
+### Removed
+- Remove unused `$onProgress` param from `then()` methods.
 
 ## [0.2.0] - 2015-04-06
 ### Added
@@ -16,14 +19,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - Support for PHP 7.0 and HHVM.
 
 ### Changed
-- Replaced FutureProcess::kill() and detach() with abort().
-- Shell::startProcess() args changed to (string $commandLine, array $options = []).
-- Moved i/o functionality into new Pipes class to reduce complexity of FutureProcess class.
+- Replace `FutureProcess::kill()` and `detach()` with `abort()`.
+- Change `Shell::startProcess()` params to `string $commandLine, array $options = []`.
+- Move i/o functionality into new `Pipes` class to reduce complexity of `FutureProcess` class.
 
 ## 0.1.0 - 2015-03-01
 ### Added
-- Shell class for parallel execution of command lines with automatic queueing of commands.
-- FutureProcess and FutureResult classes for mixed asynchronous and synchronous interfaces to child processes.
+- `Shell` class for parallel execution of command lines with automatic queueing of commands.
+- `FutureProcess` and `FutureResult` classes for mixed asynchronous and synchronous interfaces to child processes.
 - Support for PHP 5.3, 5.4, 5.5 and 5.6.
 
 [unreleased]: https://github.com/joshdifabio/future-process/compare/v0.2.0...HEAD
