@@ -2,6 +2,13 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
+## [Unreleased]
+### Added
+- Optional $length parameter to readFromPipe() methods to avoid fully draining buffers.
+
+### Changed
+- Renamed readFromBuffer() and writeToBuffer() methods to readFromPipe() and writeToPipe() respectively.
+
 ## [0.2.0] - 2015-04-06
 ### Added
 - Automatic buffering of child process i/o to prevent child processes becoming blocked by filled output buffers.
