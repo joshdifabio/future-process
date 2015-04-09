@@ -54,7 +54,7 @@ class Pipes
         return $this->resources[$descriptor];
     }
     
-    public function readFromBuffer($descriptor, $length = null)
+    public function read($descriptor, $length = null)
     {
         if (!isset($this->buffers['read'][$descriptor])) {
             throw new \RuntimeException('No pipe exists for the specified descriptor.');
@@ -76,7 +76,7 @@ class Pipes
         return $data;
     }
     
-    public function writeToBuffer($descriptor, $data)
+    public function write($descriptor, $data)
     {
         if (!isset($this->buffers['write'][$descriptor])) {
             throw new \RuntimeException('No pipe exists for the specified descriptor.');

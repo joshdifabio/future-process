@@ -86,9 +86,9 @@ class FutureProcess
      * @param int $descriptor
      * @param string $data
      */
-    public function writeToBuffer($descriptor, $data)
+    public function writeToPipe($descriptor, $data)
     {
-        $this->pipes->writeToBuffer($descriptor, $data);
+        $this->pipes->write($descriptor, $data);
     }
     
     /**
@@ -96,11 +96,11 @@ class FutureProcess
      * @param int|null $length
      * @return string
      */
-    public function readFromBuffer($descriptor, $length = null)
+    public function readFromPipe($descriptor, $length = null)
     {
         $this->wait();
 
-        return $this->pipes->readFromBuffer($descriptor, $length);
+        return $this->pipes->read($descriptor, $length);
     }
     
     /**
