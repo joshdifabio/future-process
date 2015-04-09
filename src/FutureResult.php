@@ -69,11 +69,10 @@ class FutureResult
     /**
      * @param callable $onFulfilled
      * @param callable $onError
-     * @param callable $onProgress
      * @return PromiseInterface
      */
-    public function then($onFulfilled = null, $onError = null, $onProgress = null)
+    public function then($onFulfilled = null, $onError = null)
     {
-        return $this->promise()->then($onFulfilled, $onError, $onProgress);
+        return $this->promise()->then($onFulfilled, $onError);
     }
 }
