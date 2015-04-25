@@ -13,6 +13,10 @@ sudo: false
 cache:
   directories:
     - vendor
+    
+before_cache:
+  - rm -f vendor/autoload.php
+  - rm -rf vendor/composer/*.php
 
 before_script:
   - if [[ -n $GITHUB_TOKEN ]]; then composer config -g github-oauth.github.com $GITHUB_TOKEN; fi
