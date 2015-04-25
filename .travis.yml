@@ -26,9 +26,7 @@ cache:
   directories:
     - vendor
 
-after_cache:
+after_script:
   - mv vendor.bak/autoload.php vendor
   - mv vendor.bak/composer/* vendor/composer
-
-after_script:
   - php vendor/bin/coveralls
