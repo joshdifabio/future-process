@@ -15,6 +15,7 @@ cache:
     - vendor
     
 before_cache:
+  - rm -f vendor/autoload.php
   - rm -rf vendor/composer/*.php
 
 before_script:
