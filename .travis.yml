@@ -15,6 +15,7 @@ cache:
     - vendor
 
 before_script:
+  - if [[ -n $GITHUB_TOKEN ]]; then composer config -g github-oauth.github.com $GITHUB_TOKEN; fi
   - composer install --no-interaction
   
 script:
