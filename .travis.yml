@@ -10,20 +10,23 @@ php:
 
 sudo: false
 
-cache:
-  directories:
-    - vendor
-    
-before_cache:
-  - rm -f vendor/autoload.php
-  - rm -rf vendor/composer/*.php
-
 before_script:
   - if [[ -n $GITHUB_TOKEN ]]; then composer config -g github-oauth.github.com $GITHUB_TOKEN; fi
   - composer install --no-interaction
   
 script:
   - php vendor/bin/phpunit --coverage-clover build/logs/clover.xml
-  
+    
+before_cache:
+  - mkdir -p vendor.bak/composer
+  - mv vendor/autoload.php vendor.bak
+  - mv vendor/composer/*.php vendor.bak/composer
+
+cache:
+  directories:
+    - vendor
+
 after_script:
+  - mv vendor.bak/autoload.php vendor
+  - mv vendor.bak/composer/* vendor/composer
   - php vendor/bin/coveralls
