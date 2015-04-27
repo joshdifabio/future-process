@@ -29,4 +29,4 @@ cache:
 after_script:
   - mv vendor.bak/autoload.php vendor
   - mv vendor.bak/composer/* vendor/composer
-  - php vendor/bin/coveralls
+  - if [[ $TRAVIS_PHP_VERSION = "5.3" ]]; then php vendor/bin/coveralls; fi;
