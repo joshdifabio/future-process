@@ -2,7 +2,6 @@
 namespace FutureProcess;
 
 use Clue\React\Block\Blocker;
-use React\Promise\Deferred;
 use React\Promise\PromiseInterface;
 
 /**
@@ -15,7 +14,7 @@ class FutureResult
     private $pipes;
     private $promise;
     
-    public function __construct(Blocker $blocker, Deferred $futureExitCode, Pipes $pipes)
+    public function __construct(Blocker $blocker, PromiseInterface $futureExitCode, Pipes $pipes)
     {
         $this->blocker = $blocker;
         $this->futureExitCode = $futureExitCode;
@@ -38,7 +37,7 @@ class FutureResult
      */
     public function getExitCode()
     {
-        return $this->blocker->awaitOne($this->futureExitCode->promise());
+        return $this->blocker->awaitOne($this->futureExitCode);
     }
     
     /**
@@ -49,7 +48,7 @@ class FutureResult
      */
     public function wait($timeout = null)
     {
-        $this->blocker->awaitOne($this->futureExitCode->promise(), $timeout);
+        $this->blocker->awaitOne($this->futureExitCode, $timeout);
         
         return $this;
     }
@@ -61,7 +60,7 @@ class FutureResult
     {
         if (!$this->promise) {
             $that = $this;
-            $this->promise = $this->futureExitCode->promise()->then(function () use ($that) {
+            $this->promise = $this->futureExitCode->then(function () use ($that) {
                 return $that;
             });
         }
