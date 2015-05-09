@@ -235,11 +235,10 @@ class FutureProcess
         $procResource = &$this->resource;
         $pipes = $this->pipes;
         $status = &$this->status;
-        $startTime = &$this->startTime;
         $pid = &$this->pid;
         $initTimer = $this->getInitTimerFn();
 
-        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid, $initTimer) {
+        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$pid, $initTimer) {
             $procResource = proc_open(
                 $command,
                 $options['io'],
