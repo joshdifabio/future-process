@@ -58,9 +58,11 @@ class FutureProcess
                     $startFn($command, $options);
                     return $that;
                 },
-                function (\Exception $e) use ($that) {
-                    $that->abort($e);
-                    throw $e;
+                function ($reason) use ($that) {
+                    $that->abort($reason);
+                    if ($reason instanceof \Exception) {
+                        throw $reason;
+                    }
                 }
             );
         } else {
@@ -126,11 +128,9 @@ class FutureProcess
                 proc_terminate($this->resource, $signal);
             }
         } elseif ($this->status === self::STATUS_QUEUED) {
-            if ($error) {
-                $this->deferredStart->reject($error);
-            } else {
-                $this->deferredStart->resolve();
-            }
+            $this->doExit(self::STATUS_ABORTED, $error);
+            $this->deferredStart->reject($error);
+            return;
         } else {
             return;
         }
