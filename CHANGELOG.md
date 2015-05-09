@@ -4,13 +4,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
-- Add optional `$length` param to `readFromPipe()` methods to allow reading pipe without fully draining buffer.
+- Integration with `React\EventLoop` and `React\Stream`.
 
 ### Changed
-- Rename `readFromBuffer()` and `writeToBuffer()` methods to `readFromPipe()` and `writeToPipe()` respectively.
+- `getPipe` now returns instance of `React\Stream\Stream`.
+- Replace `FutureResult::readFromBuffer()` with `getOutput()`.
 
 ### Removed
-- Remove unused `$onProgress` param from `then()` methods.
+- Unused `$onProgress` param from `then()` methods.
+- `readFromBuffer()` and `writeToBuffer()` methods from `FutureProcess`.
 
 ## [0.2.0] - 2015-04-06
 ### Added

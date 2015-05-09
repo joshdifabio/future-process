@@ -1,6 +1,7 @@
 <?php
 namespace FutureProcess;
 
+use Clue\React\Block\Blocker;
 use React\Promise\PromiseInterface;
 
 /**
@@ -8,26 +9,27 @@ use React\Promise\PromiseInterface;
  */
 class FutureResult
 {
-    private $pipes;
+    private $blocker;
     private $futureExitCode;
+    private $pipes;
     private $promise;
     
-    public function __construct(Pipes $pipes, FutureValue $futureExitCode)
+    public function __construct(Blocker $blocker, PromiseInterface $futureExitCode, Pipes $pipes)
     {
-        $this->pipes = $pipes;
+        $this->blocker = $blocker;
         $this->futureExitCode = $futureExitCode;
+        $this->pipes = $pipes;
     }
     
     /**
      * @param int $descriptor
-     * @param int|null $length
      * @return string
      */
-    public function readFromPipe($descriptor, $length = null)
+    public function getOutput($descriptor = 1)
     {
         $this->wait();
         
-        return $this->pipes->read($descriptor, $length);
+        return $this->pipes->getData($descriptor);
     }
     
     /**
@@ -35,7 +37,7 @@ class FutureResult
      */
     public function getExitCode()
     {
-        return $this->futureExitCode->wait();
+        return $this->blocker->awaitOne($this->futureExitCode);
     }
     
     /**
@@ -46,7 +48,7 @@ class FutureResult
      */
     public function wait($timeout = null)
     {
-        $this->futureExitCode->wait($timeout);
+        $this->blocker->awaitOne($this->futureExitCode, $timeout);
         
         return $this;
     }

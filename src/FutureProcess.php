@@ -1,8 +1,12 @@
 <?php
 namespace FutureProcess;
 
+use React\EventLoop\LoopInterface;
+use Clue\React\Block\Blocker;
+use React\Promise\Deferred;
 use React\Promise\FulfilledPromise;
 use React\Promise\PromiseInterface;
+use React\Stream\Stream;
 
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
@@ -16,43 +20,50 @@ class FutureProcess
     const STATUS_ERROR    = 4;
     
     private static $defaultOptions;
-    
+
+    private $eventLoop;
+    private $blocker;
     private $promise;
     private $options;
     private $futureExitCode;
-    private $queueSlot;
+    private $deferredStart;
     private $status;
     private $resource;
-    private $startTime;
     private $pid;
     private $pipes;
     private $result;
     
     public function __construct(
+        LoopInterface $eventLoop,
+        Blocker $blocker,
         $command,
         array $options,
-        FutureValue $futureExitCode,
-        FutureValue $queueSlot = null
+        Deferred $deferredStart = null
     ) {
         $options = $this->prepareOptions($options);
-        
+
+        $this->eventLoop = $eventLoop;
+        $this->blocker = $blocker;
         $this->options = $options;
-        $this->futureExitCode = $futureExitCode;
-        $this->pipes = new Pipes($options['io']);
+        $this->futureExitCode = new Deferred;
+        $this->pipes = new Pipes($eventLoop);
         
         $startFn = $this->getStartFn();
         
-        if ($this->queueSlot = $queueSlot) {
+        if ($this->deferredStart = $deferredStart) {
             $this->status = self::STATUS_QUEUED;
             $that = $this;
-            $this->promise = $queueSlot->then(
+            $this->promise = $deferredStart->promise()->then(
                 function () use ($startFn, $command, $options, $that) {
                     $startFn($command, $options);
                     return $that;
                 },
-                function (\Exception $e) use ($that) {
-                    $that->abort($e);
-                    throw $e;
+                function ($reason) use ($that) {
+                    $that->abort($reason);
+                    if ($reason instanceof \Exception) {
+                        throw $reason;
+                    }
+                    return $that;
                 }
             );
         } else {
@@ -73,34 +84,13 @@ class FutureProcess
     
     /**
      * @param int $descriptor
-     * @return null|resource
+     * @return Stream
      */
     public function getPipe($descriptor)
     {
         $this->wait();
             
-        return $this->pipes->getResource($descriptor);
-    }
-    
-    /**
-     * @param int $descriptor
-     * @param string $data
-     */
-    public function writeToPipe($descriptor, $data)
-    {
-        $this->pipes->write($descriptor, $data);
-    }
-    
-    /**
-     * @param int $descriptor
-     * @param int|null $length
-     * @return string
-     */
-    public function readFromPipe($descriptor, $length = null)
-    {
-        $this->wait();
-
-        return $this->pipes->read($descriptor, $length);
+        return $this->pipes->getPipe($descriptor);
     }
     
     /**
@@ -122,7 +112,11 @@ class FutureProcess
     public function getResult()
     {
         if (is_null($this->result)) {
-            $this->result = new FutureResult($this->pipes, $this->futureExitCode);
+            $this->result = new FutureResult(
+                $this->blocker,
+                $this->futureExitCode->promise(),
+                $this->pipes
+            );
         }
         
         return $this->result;
@@ -139,11 +133,9 @@ class FutureProcess
                 proc_terminate($this->resource, $signal);
             }
         } elseif ($this->status === self::STATUS_QUEUED) {
-            if ($error) {
-                $this->queueSlot->reject($error);
-            } else {
-                $this->queueSlot->resolve();
-            }
+            $this->doExit(self::STATUS_ABORTED, $error);
+            $this->deferredStart->reject($error);
+            return;
         } else {
             return;
         }
@@ -159,8 +151,8 @@ class FutureProcess
      */
     public function wait($timeout = null)
     {
-        if ($this->queueSlot) {
-            $this->queueSlot->wait($timeout);
+        if ($this->deferredStart) {
+            $this->blocker->awaitOne($this->deferredStart->promise(), $timeout);
         }
         
         return $this;
@@ -191,25 +183,28 @@ class FutureProcess
         } elseif (!$status['running']) {
             $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
             $this->doExit(self::STATUS_EXITED, $exitCode);
-        } elseif (!$this->hasExceededTimeLimit()) {
-            $this->pipes->readAndWrite();
         }
         
         return $status;
     }
     
-    private function hasExceededTimeLimit()
+    private function getInitTimerFn()
     {
-        if ($this->options['timeout'] && microtime(true) > $this->startTime + $this->options['timeout']) {
-            $this->abort(
-                $this->options['timeout_error'],
-                $this->options['timeout_signal']
-            );
-            
-            return true;
+        if (!$this->options['timeout']) {
+            return function () {};
         }
-        
-        return false;
+
+        $options = $this->options;
+        $eventLoop = $this->eventLoop;
+        $that = $this;
+        $futureExitCode = $this->futureExitCode;
+
+        return function () use ($options, $eventLoop, $that, $futureExitCode) {
+            $timer = $eventLoop->addTimer($options['timeout'], function () use ($that, $options) {
+                $that->abort($options['timeout_error'], $options['timeout_signal']);
+            });
+            $futureExitCode->promise()->then(array($timer, 'cancel'), array($timer, 'cancel'));
+        };
     }
     
     private static function prepareOptions(array $options)
@@ -245,24 +240,24 @@ class FutureProcess
         $procResource = &$this->resource;
         $pipes = $this->pipes;
         $status = &$this->status;
-        $startTime = &$this->startTime;
         $pid = &$this->pid;
-        
-        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid) {
+        $initTimer = $this->getInitTimerFn();
+
+        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$pid, $initTimer) {
             $procResource = proc_open(
-                "exec $command",
+                $command,
                 $options['io'],
                 $pipeResources,
                 $options['working_dir'],
                 $options['environment']
             );
             $pipes->setResources($pipeResources);
-            $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
             if (false === $procStatus = proc_get_status($procResource)) {
                 throw new \RuntimeException('Failed to start process.');
             }
             $pid = $procStatus['pid'];
+            $initTimer();
         };
     }
     

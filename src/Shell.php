@@ -1,50 +1,69 @@
 <?php
 namespace FutureProcess;
 
+use React\EventLoop\LoopInterface;
+use Clue\React\Block\Blocker;
+use React\Promise\Deferred;
+
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
  */
 class Shell
 {
-    private $processLimit = 10;
+    private $eventLoop;
+    private $blocker;
+    private $processLimit;
     private $activeProcesses;
     private $queue;
     private $canStartProcessFn;
     private $handleQueueFn;
-    private $runUntilFutureRealisedFn;
-    
-    public function __construct()
+    private $resultObserver;
+
+    public function __construct(LoopInterface $eventLoop, $processLimit = 10)
     {
+        $this->eventLoop = $eventLoop;
+        $this->blocker = new Blocker($eventLoop);
+        $this->setProcessLimit($processLimit);
         $this->activeProcesses = new \SplObjectStorage;
         $this->queue = new \SplQueue;
         $this->canStartProcessFn = $this->createCanStartProcessFn();
         $this->handleQueueFn = $this->createHandleQueueFn();
-        $this->runUntilFutureRealisedFn = $this->createRunUntilFutureRealisedFn();
+        $this->resultObserver = function () {};
     }
-    
+
     /**
      * @return FutureProcess
      */
     public function startProcess($command, array $options = array())
     {
-        $handleQueueFn = $this->handleQueueFn;
-        $handleQueueFn();
-        
+        $handleQueue = $this->handleQueueFn;
+        $activeProcesses = $this->activeProcesses;
+        $resultObserver = &$this->resultObserver;
+        $eventLoop = $this->eventLoop;
+        $timer = null;
+
+        $handleQueue();
+
         $process = $this->createProcess($command, $options);
 
-        $activeProcesses = $this->activeProcesses;
-        $process->then(function () use ($activeProcesses, $process) {
+        $process->then(function () use ($activeProcesses, $process, &$timer, $eventLoop) {
             $activeProcesses->attach($process);
+            $timer = $eventLoop->addPeriodicTimer(0.1, array($process, 'getStatus'));
         });
-        $onComplete = function () use ($activeProcesses, $process, $handleQueueFn) {
+
+        $onComplete = function () use (&$timer, $activeProcesses, $process, $handleQueue, &$resultObserver) {
+            if ($timer) {
+                $timer->cancel();
+            }
             $activeProcesses->detach($process);
-            $handleQueueFn();
+            $handleQueue();
+            $resultObserver($process->getResult());
         };
         $process->getResult()->then($onComplete, $onComplete);
-        
+
         return $process;
     }
-    
+
     /**
      * @param null|int $processLimit
      */
@@ -52,56 +71,51 @@ class Shell
     {
         $this->processLimit = $processLimit;
     }
-    
+
     /**
      * @param double $timeout OPTIONAL
      * @throws TimeoutException
      */
     public function wait($timeout = null)
     {
-        if ($timeout) {
-            $absoluteTimeout = microtime(true) + $timeout;
-            
-            while ($this->activeProcesses->count() || $this->queue->count()) {
-                $this->refreshAllProcesses();
-
-                if (microtime(true) >= $absoluteTimeout) {
-                    throw new TimeoutException;
-                }
-
-                usleep(1000);
-            }
-        } else {
-            while ($this->activeProcesses->count() || $this->queue->count()) {
-                $this->refreshAllProcesses();
-                usleep(1000);
-            }
+        $processes = $this->activeProcesses;
+        $queue = $this->queue;
+        
+        if (!$processes->count() && !$queue->count()) {
+            return;
         }
+
+        $deferred = new Deferred;
+
+        $afterResult = function () use ($deferred, $processes, $queue) {
+            if (!$processes->count() && !$queue->count()) {
+                $deferred->resolve();
+            }
+        };
+        $this->resultObserver = function (FutureResult $result) use ($processes, $queue, $afterResult) {
+            if (!$processes->count() && !$queue->count()) {
+                // don't resolve yet as $result->then() might start other processes when it resolves
+                $result->then($afterResult, $afterResult);
+            }
+        };
+
+        $this->blocker->awaitOne($deferred->promise(), $timeout);
     }
-    
-    public function refreshAllProcesses()
-    {
-        foreach ($this->activeProcesses as $process) {
-            $process->getStatus(true);
-        }
-    }
-    
+
     private function createProcess($command, array $options)
     {
-        $futureExitCode = new FutureValue($this->runUntilFutureRealisedFn);
-        
         $canStartProcessFn = $this->canStartProcessFn;
         if (!$canStartProcessFn()) {
-            $queueSlot = new FutureValue($this->runUntilFutureRealisedFn);
-            $process = new FutureProcess($command, $options, $futureExitCode, $queueSlot);
+            $queueSlot = new Deferred;
+            $process = new FutureProcess($this->eventLoop, $this->blocker, $command, $options, $queueSlot);
             $this->queue->enqueue($queueSlot);
         } else {
-            $process = new FutureProcess($command, $options, $futureExitCode);
+            $process = new FutureProcess($this->eventLoop, $this->blocker, $command, $options);
         }
         
         return $process;
     }
-    
+
     private function createCanStartProcessFn()
     {
         $activeProcesses = $this->activeProcesses;
@@ -111,7 +125,7 @@ class Shell
             return (!$processLimit || $activeProcesses->count() < $processLimit);
         };
     }
-    
+
     private function createHandleQueueFn()
     {
         $queue = $this->queue;
@@ -120,30 +134,6 @@ class Shell
         return function () use ($queue, $canStartProcessFn) {
             while ($queue->count() && $canStartProcessFn()) {
                 $queue->dequeue()->resolve();
-            }
-        };
-    }
-    
-    private function createRunUntilFutureRealisedFn()
-    {
-        $activeProcesses = $this->activeProcesses;
-        
-        return function ($timeout, $futureValue) use ($activeProcesses) {
-            $absoluteTimeout = $timeout ? microtime(true) + $timeout : null;
-
-            while (!$futureValue->isRealised()) {
-                foreach ($activeProcesses as $process) {
-                    $process->getStatus(true);
-                    if ($futureValue->isRealised()) {
-                        return;
-                    }
-                }
-
-                if ($absoluteTimeout && microtime(true) >= $absoluteTimeout) {
-                    throw new TimeoutException;
-                }
-
-                usleep(1000);
             }
         };
     }
