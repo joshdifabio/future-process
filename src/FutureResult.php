@@ -20,14 +20,13 @@ class FutureResult
     
     /**
      * @param int $descriptor
-     * @param int|null $length
      * @return string
      */
-    public function readFromPipe($descriptor, $length = null)
+    public function getOutput($descriptor = 1)
     {
         $this->wait();
         
-        return $this->pipes->read($descriptor, $length);
+        return $this->pipes->getData($descriptor);
     }
     
     /**
