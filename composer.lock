@@ -4,21 +4,15 @@
         "Read more about it at http://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "54e08ef3392c31d3a31956ce0adb81b7",
+    "hash": "48d63f6dd67ab78adb5a48a269493455",
     "packages": [
         {
             "name": "clue/block-react",
-            "version": "v0.1.1",
+            "version": "dev-await-timeout",
             "source": {
                 "type": "git",
-                "url": "https://github.com/clue/php-block-react.git",
-                "reference": "0ee1990f69fcf90348dee20d06880a8b2b3364ab"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/clue/php-block-react/zipball/0ee1990f69fcf90348dee20d06880a8b2b3364ab",
-                "reference": "0ee1990f69fcf90348dee20d06880a8b2b3364ab",
-                "shasum": ""
+                "url": "git@github.com:joshdifabio/php-block-react.git",
+                "reference": "b97941a7e8ca7576870326a37f412ab008e88b64"
             },
             "require": {
                 "php": ">=5.3",
@@ -31,7 +25,6 @@
                     "Clue\\React\\Block\\": "src/"
                 }
             },
-            "notification-url": "https://packagist.org/downloads/",
             "license": [
                 "MIT"
             ],
@@ -44,14 +37,14 @@
             "description": "Integrate async React PHP components into your blocking environment",
             "homepage": "https://github.com/clue/php-block-react",
             "keywords": [
+                "Event Loop",
+                "Promise",
+                "ReactPHP",
                 "async",
                 "blocking",
-                "event loop",
-                "promise",
-                "reactphp",
                 "synchronous"
             ],
-            "time": "2015-04-05 17:01:22"
+            "time": "2015-05-09 14:08:57"
         },
         {
             "name": "evenement/evenement",
@@ -1713,6 +1706,7 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
+        "clue/block-react": 20,
         "satooshi/php-coveralls": 20
     },
     "prefer-stable": false,
