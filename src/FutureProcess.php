@@ -21,6 +21,7 @@ class FutureProcess
     
     private static $defaultOptions;
 
+    private $eventLoop;
     private $blocker;
     private $promise;
     private $options;
@@ -28,7 +29,6 @@ class FutureProcess
     private $deferredStart;
     private $status;
     private $resource;
-    private $startTime;
     private $pid;
     private $pipes;
     private $result;
@@ -42,6 +42,7 @@ class FutureProcess
     ) {
         $options = $this->prepareOptions($options);
 
+        $this->eventLoop = $eventLoop;
         $this->blocker = $blocker;
         $this->options = $options;
         $this->futureExitCode = new Deferred;
@@ -182,18 +183,23 @@ class FutureProcess
         return $status;
     }
     
-    private function hasExceededTimeLimit()
+    private function getInitTimerFn()
     {
-        if ($this->options['timeout'] && microtime(true) > $this->startTime + $this->options['timeout']) {
-            $this->abort(
-                $this->options['timeout_error'],
-                $this->options['timeout_signal']
-            );
-            
-            return true;
+        if (!$this->options['timeout']) {
+            return function () {};
         }
-        
-        return false;
+
+        $options = $this->options;
+        $eventLoop = $this->eventLoop;
+        $that = $this;
+        $futureExitCode = $this->futureExitCode;
+
+        return function () use ($options, $eventLoop, $that, $futureExitCode) {
+            $timer = $eventLoop->addTimer($options['timeout'], function () use ($that, $options) {
+                $that->abort($options['timeout_error'], $options['timeout_signal']);
+            });
+            $futureExitCode->promise()->then(array($timer, 'cancel'), array($timer, 'cancel'));
+        };
     }
     
     private static function prepareOptions(array $options)
@@ -231,22 +237,23 @@ class FutureProcess
         $status = &$this->status;
         $startTime = &$this->startTime;
         $pid = &$this->pid;
-        
-        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid) {
+        $initTimer = $this->getInitTimerFn();
+
+        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$startTime, &$pid, $initTimer) {
             $procResource = proc_open(
-                "exec $command",
+                $command,
                 $options['io'],
                 $pipeResources,
                 $options['working_dir'],
                 $options['environment']
             );
             $pipes->setResources($pipeResources);
-            $startTime = microtime(true);
             $status = FutureProcess::STATUS_RUNNING;
             if (false === $procStatus = proc_get_status($procResource)) {
                 throw new \RuntimeException('Failed to start process.');
             }
             $pid = $procStatus['pid'];
+            $initTimer();
         };
     }
     

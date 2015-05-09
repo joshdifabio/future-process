@@ -107,7 +107,7 @@ class Shell
         $canStartProcessFn = $this->canStartProcessFn;
         if (!$canStartProcessFn()) {
             $queueSlot = new Deferred;
-            $process = new FutureProcess($this->eventLoop, $this->blocker, $command, $options, $queueSlot->promise());
+            $process = new FutureProcess($this->eventLoop, $this->blocker, $command, $options, $queueSlot);
             $this->queue->enqueue($queueSlot);
         } else {
             $process = new FutureProcess($this->eventLoop, $this->blocker, $command, $options);

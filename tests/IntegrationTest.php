@@ -2,6 +2,8 @@
 namespace FutureProcess;
 
 use Symfony\Component\Process\PhpExecutableFinder;
+use React\EventLoop\Factory as LoopFactory;
+use Clue\React\Block\TimeoutException;
 
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
@@ -9,7 +11,8 @@ use Symfony\Component\Process\PhpExecutableFinder;
 class IntegrationTest extends \PHPUnit_Framework_TestCase
 {
     private $phpExecutablePath;
-    
+    private $shell;
+
     public function __construct($name = null, array $data = array(), $dataName = '')
     {
         parent::__construct($name, $data, $dataName);
@@ -17,12 +20,16 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $finder = new PhpExecutableFinder;
         $this->phpExecutablePath = $finder->find();
     }
+
+    protected function setUp()
+    {
+        $eventLoop = LoopFactory::create();
+        $this->shell = new Shell($eventLoop);
+    }
     
     public function testLargeIO()
     {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
+        $process = $this->shell->startProcess(sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg(
                 '$stdin = fopen("php://stdin", "r");' .
@@ -34,16 +41,14 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             )
         ));
         
-        $process->writeToPipe(0, str_repeat("X", 10000000));
+        $process->getPipe(0)->write(str_repeat("X", 10000000));
         $process->getResult()->wait(5);
         $this->assertSame(0, $process->getResult()->getExitCode());
-        $this->assertSame(10000000, strlen($process->readFromPipe(1)));
+        $this->assertSame(10000000, strlen($process->getResult()->getOutput(1)));
     }
     
     public function testProcessTimeLimitExceeded()
     {
-        $shell = new Shell;
-        
         $command = sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg(
@@ -55,10 +60,15 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $thrown = new Exception;
         
-        $process = $shell->startProcess($command, array(
+        $process = $this->shell->startProcess($command, array(
             'timeout' => 0.5,
             'timeout_error' => $thrown,
         ));
+
+        $output = '';
+        $process->getPipe(1)->on('data', function ($data) use (&$output) {
+            $output .= $data;
+        });
         
         $process->wait(1);
         
@@ -71,13 +81,12 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         
         $process->wait(1);
         
-        $this->assertSame('Hello world!', $process->readFromPipe(1));
+        $this->assertSame('Hello world!', $output);
     }
     
     public function testQuietlyAbortRunningProcess()
     {
-        $shell = new Shell;
-        $process = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process = $this->shell->startProcess($this->phpSleepCommand(0.5));
         
         $process->then(function ($process) {
             $process->abort();
@@ -113,10 +122,9 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testQuietlyAbortQueuedProcess()
     {
-        $shell = new Shell;
-        $shell->setProcessLimit(1);
-        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
-        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $this->shell->setProcessLimit(1);
+        $process1 = $this->shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $this->shell->startProcess($this->phpSleepCommand(0.5));
         
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
@@ -152,9 +160,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testLateAbort()
     {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
+        $process = $this->shell->startProcess(sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg('echo "Hello world!";')
         ));
@@ -176,9 +182,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testRepeatAbort()
     {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
+        $process = $this->shell->startProcess(sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
         ));
@@ -197,30 +201,12 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testProcessGetPipeDescriptorValidation()
     {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
+        $process = $this->shell->startProcess(sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg('usleep(100000); echo "Hello world!";')
         ));
         
-        $process->writeToPipe(0, 'Hello!');
-        try {
-            $process->writeToPipe(5, 'Hello!');
-            $this->fail('The expected exception was not thrown');
-        } catch (\RuntimeException $e) {
-            
-        }
-        
-        $process->readFromPipe(1);
-        try {
-            $process->readFromPipe(5);
-            $this->fail('The expected exception was not thrown');
-        } catch (\RuntimeException $e) {
-            
-        }
-        
-        $process->getPipe(1);
+        $process->getPipe(0);
         try {
             $process->getPipe(5);
             $this->fail('The expected exception was not thrown');
@@ -229,69 +215,24 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         }
     }
     
-    public function testReadFromPipeAndBuffer()
-    {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
-            $this->phpExecutablePath,
-            escapeshellarg('echo "Hello world!"; usleep(100000); echo "Goodbye world!";')
-        ));
-        
-        $this->assertSame('Hello world!', fread($process->getPipe(1), 20));
-        $this->assertSame(0, $process->getResult()->getExitCode());
-        $this->assertSame('Goodbye world!', $process->readFromPipe(1));
-        $this->assertSame('', $process->getResult()->readFromPipe(1));
-    }
-    
-    public function testReadFromPipe()
-    {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess(sprintf('%s -r %s',
-            $this->phpExecutablePath,
-            escapeshellarg('usleep(100000); echo "Hello world!";')
-        ));
-        
-        $this->assertSame('Hello world!', fread($process->getPipe(1), 20));
-    }
-    
-    public function testWriteToPipe()
-    {
-        $shell = new Shell;
-        $process = $shell->startProcess(sprintf('%s -r %s',
-            $this->phpExecutablePath,
-            escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
-        ));
-        
-        fwrite($process->getPipe(0), "Hello world!\n");
-        
-        $result = $process->getResult()->wait(2);
-        
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame("Hello world!\n", $result->readFromPipe(1));
-    }
-    
     public function testWriteToStdin()
     {
-        $shell = new Shell;
-        $process = $shell->startProcess(sprintf('%s -r %s',
+        $process = $this->shell->startProcess(sprintf('%s -r %s',
             $this->phpExecutablePath,
             escapeshellarg('echo fread(fopen("php://stdin", "r"), 20);')
         ));
         
-        $process->writeToPipe(0, "Hello world!\n");
+        $process->getPipe(0)->write("Hello world!\n");
         
         $result = $process->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame("Hello world!\n", $result->readFromPipe(1));
+        $this->assertSame(0, $result->getExitCode(), $result->getOutput(2));
+        $this->assertSame("Hello world!\n", $result->getOutput(1));
     }
     
     public function testWriteEmptyStringToStdin()
     {
-        $shell = new Shell;
-        $process = $shell->startProcess(
+        $process = $this->shell->startProcess(
             "{$this->phpExecutablePath} -r "
             . escapeshellarg(implode("\n", array(
                 '$stdin = fopen("php://stdin", "r");',
@@ -299,19 +240,18 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             )))
         );
         $process->promise()->then(function ($process) {
-            $process->writeToPipe(0, '0');
+            $process->getPipe(0)->write('0');
         });
         
         $result = $process->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame('0', $result->readFromPipe(1));
+        $this->assertSame(0, $result->getExitCode(), $result->getOutput(2));
+        $this->assertSame('0', $result->getOutput(1));
     }
     
     public function testAbortRunningProcess()
     {
-        $shell = new Shell;
-        $process = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process = $this->shell->startProcess($this->phpSleepCommand(0.5));
         
         $thrown = new Exception;
         $process->then(function ($process) use ($thrown) {
@@ -355,10 +295,9 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testAbortQueuedProcess()
     {
-        $shell = new Shell;
-        $shell->setProcessLimit(1);
-        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
-        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $this->shell->setProcessLimit(1);
+        $process1 = $this->shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $this->shell->startProcess($this->phpSleepCommand(0.5));
         
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process1->getStatus());
         $this->assertSame(FutureProcess::STATUS_QUEUED, $process2->getStatus());
@@ -395,53 +334,37 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testPHPHelloWorld()
     {
-        $shell = new Shell;
         $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
-        $result = $shell->startProcess($command)->getResult()->wait(2);
+        $result = $this->shell->startProcess($command)->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame('Hello World', $result->readFromPipe(1));
-    }
-    
-    public function testPartiallyDrainReadBuffer()
-    {
-        $shell = new Shell;
-        $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
-        $process = $shell->startProcess($command);
-        $result = $process->getResult()->wait(2);
-        
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame('Hello', $result->readFromPipe(1, 5));
-        $this->assertSame(' Wo', $process->readFromPipe(1, 3));
-        $this->assertSame('rld', $result->readFromPipe(1, 3));
+        $this->assertSame(0, $result->getExitCode(), $result->getOutput(2));
+        $this->assertSame('Hello World', $result->getOutput(1));
     }
     
     public function testExecuteCommandWithTimeout()
     {
-        $shell = new Shell;
         $command = $this->phpSleepCommand(0.1);
         
         $startTime = microtime(true);
         try {
-            $shell->startProcess($command)->getResult()->wait(0.05);
+            $this->shell->startProcess($command)->getResult()->wait(0.05);
             $this->fail('Expected TimeoutException was not thrown');
         } catch (TimeoutException $e) {
             $runTime = microtime(true) - $startTime;
             $this->assertGreaterThanOrEqual(0.05, $runTime);
         }
         
-        $result = $shell->startProcess($command)->getResult()->wait(0.5);
+        $result = $this->shell->startProcess($command)->getResult()->wait(0.5);
         $this->assertSame(0, $result->getExitCode());
     }
     
     public function testQueue()
     {
-        $shell = new Shell;
-        $shell->setProcessLimit(2);
+        $this->shell->setProcessLimit(2);
         
-        $process1 = $shell->startProcess($this->phpSleepCommand(0.5));
-        $process2 = $shell->startProcess($this->phpSleepCommand(0.5));
-        $process3 = $shell->startProcess($this->phpSleepCommand(0.5));
+        $process1 = $this->shell->startProcess($this->phpSleepCommand(0.5));
+        $process2 = $this->shell->startProcess($this->phpSleepCommand(0.5));
+        $process3 = $this->shell->startProcess($this->phpSleepCommand(0.5));
         
         usleep(100000);
         
@@ -454,8 +377,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testAwaitShell()
     {
-        $shell = new Shell;
-        $shell->setProcessLimit(2);
+        $this->shell->setProcessLimit(2);
         
         $command = sprintf('%s -r %s',
             $this->phpExecutablePath,
@@ -466,23 +388,30 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         );
         
         $processes = array();
+        $outputs = array();
         
         for ($i = 0; $i < 4; $i++) {
-            $processes[$i] = $shell->startProcess($command);
+            $processes[$i] = $this->shell->startProcess($command);
+            $outputs[$i] = '';
+
+            $processes[$i]->then(function ($process) use (&$outputs, $i) {
+                $process->getPipe(1)->on('data', function ($data) use (&$outputs, $i) {
+                    $outputs[$i] .= $data;
+                });
+            });
         }
         
-        $shell->wait(5);
+        $this->shell->wait(5);
         
-        foreach ($processes as $process) {
+        foreach ($processes as $key => $process) {
             $this->assertSame(FutureProcess::STATUS_EXITED, $process->getStatus(false));
-            $this->assertSame('Hello world!', $process->readFromPipe(1));
+            $this->assertSame('Hello world!', $outputs[$key]);
         }
     }
     
     public function testShellTimeout()
     {
-        $shell = new Shell;
-        $shell->setProcessLimit(1);
+        $this->shell->setProcessLimit(1);
         
         $command1 = sprintf('%s -r %s',
             $this->phpExecutablePath,
@@ -499,18 +428,26 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             )
         );
         
-        $process1 = $shell->startProcess($command1);
-        $process2 = $shell->startProcess($command2);
+        $process1 = $this->shell->startProcess($command1);
+        $process2 = $this->shell->startProcess($command2);
+
+        $output = '';
+
+        $process1->then(function ($process) use (&$output) {
+            $process->getPipe(1)->on('data', function ($data) use (&$output) {
+                $output .= $data;
+            });
+        });
         
         try {
-            $shell->wait(0.5);
+            $this->shell->wait(0.5);
             $this->fail('The expected exception was not thrown');
         } catch (TimeoutException $e) {
             
         }
         
         $this->assertSame(FutureProcess::STATUS_EXITED, $process1->getStatus(false));
-        $this->assertSame('Hello world!', $process1->readFromPipe(1));
+        $this->assertSame('Hello world!', $output);
         
         $this->assertSame(FutureProcess::STATUS_RUNNING, $process2->getStatus(false));
         $process2->abort();
@@ -518,27 +455,23 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testGetPid()
     {
-        $shell = new Shell;
-        
-        $process = $shell->startProcess("{$this->phpExecutablePath} -r \"echo getmypid();\"");
+        $process = $this->shell->startProcess("exec {$this->phpExecutablePath} -r \"echo getmypid();\"");
         
         $reportedPid = $process->getPid();
         
-        $actualPid = (int)$process->getResult()->readFromPipe(1);
+        $actualPid = (int)$process->getResult()->getOutput(1);
         
         $this->assertSame($actualPid, $reportedPid);
     }
     
     public function testLateStreamResolution()
     {
-        $shell = new Shell;
-        
-        $result = $shell->startProcess("{$this->phpExecutablePath} -r \"echo 'hello';\"")
+        $result = $this->shell->startProcess("{$this->phpExecutablePath} -r \"echo 'hello';\"")
             ->getResult();
         
         $output = null;
         $result->then(function ($result) use (&$output) {
-            $output = $result->readFromPipe(1);
+            $output = $result->getOutput(1);
         });
         
         $result->wait(2);
@@ -548,9 +481,7 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
     
     public function testBufferFill()
     {
-        $shell = new Shell;
-
-        $result = $shell->startProcess("php -r \"echo str_repeat('x', 100000);\"")
+        $result = $this->shell->startProcess("php -r \"echo str_repeat('x', 100000);\"")
             ->getResult();
 
         try {
@@ -559,18 +490,17 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
             $this->fail('The child process is blocked. The output buffer is probably full.');
         }
 
-        $this->assertSame(100000, strlen($result->readFromPipe(1)));
+        $this->assertSame(100000, strlen($result->getOutput(1)));
     }
     
     public function testRepeatedReadCalls()
     {
-        $shell = new Shell;
         $command = "{$this->phpExecutablePath} -r \"echo 'Hello World';\"";
-        $result = $shell->startProcess($command)->getResult()->wait(2);
+        $result = $this->shell->startProcess($command)->getResult()->wait(2);
         
-        $this->assertSame(0, $result->getExitCode(), $result->readFromPipe(2));
-        $this->assertSame('Hello World', $result->readFromPipe(1));
-        $this->assertSame('', $result->readFromPipe(1));
+        $this->assertSame(0, $result->getExitCode(), $result->getOutput(2));
+        $this->assertSame('Hello World', $result->getOutput(1));
+        $this->assertSame('Hello World', $result->getOutput(1));
     }
     
     private function phpSleepCommand($seconds)

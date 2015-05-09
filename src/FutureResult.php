@@ -61,7 +61,7 @@ class FutureResult
     {
         if (!$this->promise) {
             $that = $this;
-            $this->promise = $this->futureExitCode->then(function () use ($that) {
+            $this->promise = $this->futureExitCode->promise()->then(function () use ($that) {
                 return $that;
             });
         }
