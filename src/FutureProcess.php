@@ -2,6 +2,8 @@
 namespace FutureProcess;
 
 use React\EventLoop\LoopInterface;
+use Clue\React\Block\Blocker;
+use React\Promise\Deferred;
 use React\Promise\FulfilledPromise;
 use React\Promise\PromiseInterface;
 use React\Stream\Stream;
@@ -19,10 +21,11 @@ class FutureProcess
     
     private static $defaultOptions;
 
+    private $blocker;
     private $promise;
     private $options;
     private $futureExitCode;
-    private $queueSlot;
+    private $deferredStart;
     private $status;
     private $resource;
     private $startTime;
@@ -32,23 +35,24 @@ class FutureProcess
     
     public function __construct(
         LoopInterface $eventLoop,
+        Blocker $blocker,
         $command,
         array $options,
-        FutureValue $futureExitCode,
-        FutureValue $queueSlot = null
+        Deferred $deferredStart = null
     ) {
         $options = $this->prepareOptions($options);
 
+        $this->blocker = $blocker;
         $this->options = $options;
-        $this->futureExitCode = $futureExitCode;
+        $this->futureExitCode = new Deferred;
         $this->pipes = new Pipes($eventLoop);
         
         $startFn = $this->getStartFn();
         
-        if ($this->queueSlot = $queueSlot) {
+        if ($this->deferredStart = $deferredStart) {
             $this->status = self::STATUS_QUEUED;
             $that = $this;
-            $this->promise = $queueSlot->then(
+            $this->promise = $deferredStart->promise()->then(
                 function () use ($startFn, $command, $options, $that) {
                     $startFn($command, $options);
                     return $that;
@@ -104,7 +108,7 @@ class FutureProcess
     public function getResult()
     {
         if (is_null($this->result)) {
-            $this->result = new FutureResult($this->pipes, $this->futureExitCode);
+            $this->result = new FutureResult($this->blocker, $this->futureExitCode, $this->pipes);
         }
         
         return $this->result;
@@ -122,9 +126,9 @@ class FutureProcess
             }
         } elseif ($this->status === self::STATUS_QUEUED) {
             if ($error) {
-                $this->queueSlot->reject($error);
+                $this->deferredStart->reject($error);
             } else {
-                $this->queueSlot->resolve();
+                $this->deferredStart->resolve();
             }
         } else {
             return;
@@ -141,8 +145,8 @@ class FutureProcess
      */
     public function wait($timeout = null)
     {
-        if ($this->queueSlot) {
-            $this->queueSlot->wait($timeout);
+        if ($this->deferredStart) {
+            $this->blocker->awaitOne($this->deferredStart->promise(), $timeout);
         }
         
         return $this;
