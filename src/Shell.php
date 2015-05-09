@@ -1,20 +1,25 @@
 <?php
 namespace FutureProcess;
 
+use React\EventLoop\LoopInterface;
+
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
  */
 class Shell
 {
-    private $processLimit = 10;
+    private $eventLoop;
+    private $processLimit;
     private $activeProcesses;
     private $queue;
     private $canStartProcessFn;
     private $handleQueueFn;
     private $runUntilFutureRealisedFn;
     
-    public function __construct()
+    public function __construct(LoopInterface $eventLoop, $processLimit = 10)
     {
+        $this->eventLoop = $eventLoop;
+        $this->setProcessLimit($processLimit);
         $this->activeProcesses = new \SplObjectStorage;
         $this->queue = new \SplQueue;
         $this->canStartProcessFn = $this->createCanStartProcessFn();
@@ -93,10 +98,10 @@ class Shell
         $canStartProcessFn = $this->canStartProcessFn;
         if (!$canStartProcessFn()) {
             $queueSlot = new FutureValue($this->runUntilFutureRealisedFn);
-            $process = new FutureProcess($command, $options, $futureExitCode, $queueSlot);
+            $process = new FutureProcess($this->eventLoop, $command, $options, $futureExitCode, $queueSlot);
             $this->queue->enqueue($queueSlot);
         } else {
-            $process = new FutureProcess($command, $options, $futureExitCode);
+            $process = new FutureProcess($this->eventLoop, $command, $options, $futureExitCode);
         }
         
         return $process;

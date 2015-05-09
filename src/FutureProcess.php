@@ -1,8 +1,10 @@
 <?php
 namespace FutureProcess;
 
+use React\EventLoop\LoopInterface;
 use React\Promise\FulfilledPromise;
 use React\Promise\PromiseInterface;
+use React\Stream\Stream;
 
 /**
  * @author Josh Di Fabio <joshdifabio@gmail.com>
@@ -16,7 +18,7 @@ class FutureProcess
     const STATUS_ERROR    = 4;
     
     private static $defaultOptions;
-    
+
     private $promise;
     private $options;
     private $futureExitCode;
@@ -29,16 +31,17 @@ class FutureProcess
     private $result;
     
     public function __construct(
+        LoopInterface $eventLoop,
         $command,
         array $options,
         FutureValue $futureExitCode,
         FutureValue $queueSlot = null
     ) {
         $options = $this->prepareOptions($options);
-        
+
         $this->options = $options;
         $this->futureExitCode = $futureExitCode;
-        $this->pipes = new Pipes($options['io']);
+        $this->pipes = new Pipes($eventLoop);
         
         $startFn = $this->getStartFn();
         
@@ -73,34 +76,13 @@ class FutureProcess
     
     /**
      * @param int $descriptor
-     * @return null|resource
+     * @return Stream
      */
     public function getPipe($descriptor)
     {
         $this->wait();
             
-        return $this->pipes->getResource($descriptor);
-    }
-    
-    /**
-     * @param int $descriptor
-     * @param string $data
-     */
-    public function writeToPipe($descriptor, $data)
-    {
-        $this->pipes->write($descriptor, $data);
-    }
-    
-    /**
-     * @param int $descriptor
-     * @param int|null $length
-     * @return string
-     */
-    public function readFromPipe($descriptor, $length = null)
-    {
-        $this->wait();
-
-        return $this->pipes->read($descriptor, $length);
+        return $this->pipes->getPipe($descriptor);
     }
     
     /**
