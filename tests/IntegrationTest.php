@@ -135,27 +135,16 @@ class IntegrationTest extends \PHPUnit_Framework_TestCase
         $process2->getResult()->wait(0);
         
         $that = $this;
-        $processPromiseResolved = false;
+        $resolution = null;
         $process2->then(
-            function () use (&$processPromiseResolved) {
-                $processPromiseResolved = true;
+            function ($value) use (&$resolution) {
+                $resolution = $value;
             },
             function () use ($that) {
                 $that->fail();
             }
         );
-        $this->assertTrue($processPromiseResolved);
-        
-        $processPromiseResolved = false;
-        $process2->then(
-            function () use (&$processPromiseResolved) {
-                $processPromiseResolved = true;
-            },
-            function () use ($that) {
-                $that->fail();
-            }
-        );
-        $this->assertTrue($processPromiseResolved);
+        $this->assertSame($process2, $resolution);
     }
     
     public function testLateAbort()

@@ -63,6 +63,7 @@ class FutureProcess
                     if ($reason instanceof \Exception) {
                         throw $reason;
                     }
+                    return $that;
                 }
             );
         } else {
