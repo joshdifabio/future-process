@@ -18,10 +18,6 @@ install: composer install --no-interaction
   
 script: php vendor/bin/phpunit --coverage-clover build/logs/clover.xml
 
-before_cache:
-  - rm -f vendor/autoload.php
-  - rm -rf vendor/composer/*.php
-
 cache:
   directories: vendor
 
