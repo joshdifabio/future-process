@@ -1,6 +1,6 @@
 # Future Process
 
-[![Build Status](https://img.shields.io/travis/joshdifabio/future-process.svg?style=flat-square)](https://travis-ci.org/joshdifabio/future-process) [![Coveralls](https://img.shields.io/coveralls/joshdifabio/future-process.svg?style=flat-square)](https://coveralls.io/r/joshdifabio/future-process) [![Code Quality](https://img.shields.io/scrutinizer/g/joshdifabio/future-process.svg?style=flat-square)](https://scrutinizer-ci.com/g/joshdifabio/future-process/)
+[![Build Status](https://img.shields.io/travis/joshdifabio/future-process.svg?style=flat-square)](https://travis-ci.org/joshdifabio/future-process) [![Codecov](https://img.shields.io/codecov/c/github/joshdifabio/future-process.svg?style=flat-square)](https://codecov.io/github/joshdifabio/future-process) [![Code Quality](https://img.shields.io/scrutinizer/g/joshdifabio/future-process.svg?style=flat-square)](https://scrutinizer-ci.com/g/joshdifabio/future-process/)
 
 ## Introduction
 
