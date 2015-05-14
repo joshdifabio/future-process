@@ -10,23 +10,19 @@ php:
 
 sudo: false
 
-before_script:
+before_install:
   - if [[ -n $GITHUB_TOKEN ]]; then composer config -g github-oauth.github.com $GITHUB_TOKEN; fi
-  - composer install --no-interaction
+  - composer self-update
+
+install: composer install --no-interaction
   
-script:
-  - php vendor/bin/phpunit --coverage-clover build/logs/clover.xml
-    
+script: php vendor/bin/phpunit --coverage-clover build/logs/clover.xml
+
 before_cache:
-  - mkdir -p vendor.bak/composer
-  - mv vendor/autoload.php vendor.bak
-  - mv vendor/composer/*.php vendor.bak/composer
+  - rm -f vendor/autoload.php
+  - rm -rf vendor/composer/*.php
 
 cache:
-  directories:
-    - vendor
+  directories: vendor
 
-after_script:
-  - mv vendor.bak/autoload.php vendor
-  - mv vendor.bak/composer/* vendor/composer
-  - if [[ $TRAVIS_PHP_VERSION = "5.3" ]]; then php vendor/bin/coveralls; fi;
+after_success: if [[ $TRAVIS_PHP_VERSION = "5.3" ]]; then bash <(curl -s https://codecov.io/bash); fi;
