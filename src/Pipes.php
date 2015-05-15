@@ -58,6 +58,8 @@ class Pipes
 
     private function initPipe($descriptor, $resource)
     {
+        stream_set_blocking($resource, 0);
+        
         $stream = new Stream($resource, $this->eventLoop);
 
         if ($this->collectData) {

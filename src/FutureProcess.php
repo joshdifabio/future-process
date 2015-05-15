@@ -18,21 +18,13 @@ class FutureProcess
     const STATUS_EXITED   = 2;
     const STATUS_ABORTED  = 3;
     const STATUS_ERROR    = 4;
-    
-    private static $defaultOptions;
 
-    private $eventLoop;
     private $blocker;
+    private $process;
     private $promise;
-    private $options;
-    private $futureExitCode;
-    private $deferredStart;
-    private $status;
-    private $resource;
-    private $pid;
-    private $pipes;
     private $result;
-    
+    private $deferredStart;
+
     public function __construct(
         LoopInterface $eventLoop,
         Blocker $blocker,
@@ -40,38 +32,17 @@ class FutureProcess
         array $options,
         Deferred $deferredStart = null
     ) {
-        $options = $this->prepareOptions($options);
-
-        $this->eventLoop = $eventLoop;
         $this->blocker = $blocker;
-        $this->options = $options;
-        $this->futureExitCode = new Deferred;
-        $this->pipes = new Pipes($eventLoop);
-        
-        $startFn = $this->getStartFn();
+        $this->process = new Process($eventLoop, $command, $options);
         
         if ($this->deferredStart = $deferredStart) {
-            $this->status = self::STATUS_QUEUED;
-            $that = $this;
-            $this->promise = $deferredStart->promise()->then(
-                function () use ($startFn, $command, $options, $that) {
-                    $startFn($command, $options);
-                    return $that;
-                },
-                function ($reason) use ($that) {
-                    $that->abort($reason);
-                    if ($reason instanceof \Exception) {
-                        throw $reason;
-                    }
-                    return $that;
-                }
-            );
+            $this->promise = $this->startDeferred();
         } else {
-            $startFn($command, $options);
+            $this->process->start();
             $this->promise = new FulfilledPromise($this);
         }
     }
-    
+
     /**
      * @return int
      */
@@ -79,7 +50,7 @@ class FutureProcess
     {
         $this->wait();
         
-        return $this->pid;
+        return $this->process->getPid();
     }
     
     /**
@@ -90,7 +61,7 @@ class FutureProcess
     {
         $this->wait();
             
-        return $this->pipes->getPipe($descriptor);
+        return $this->process->getPipes()->getPipe($descriptor);
     }
     
     /**
@@ -99,11 +70,7 @@ class FutureProcess
      */
     public function getStatus($refresh = true)
     {
-        if ($refresh && $this->status === self::STATUS_RUNNING) {
-            $this->refreshStatus();
-        }
-        
-        return $this->status;
+        return $this->process->getStatus($refresh);
     }
     
     /**
@@ -114,8 +81,8 @@ class FutureProcess
         if (is_null($this->result)) {
             $this->result = new FutureResult(
                 $this->blocker,
-                $this->futureExitCode->promise(),
-                $this->pipes
+                $this->process->whenExited(),
+                $this->process->getPipes()
             );
         }
         
@@ -128,19 +95,13 @@ class FutureProcess
      */
     public function abort(\Exception $error = null, $signal = 15)
     {
-        if ($this->status === self::STATUS_RUNNING) {
-            if (null !== $signal) {
-                proc_terminate($this->resource, $signal);
-            }
-        } elseif ($this->status === self::STATUS_QUEUED) {
-            $this->doExit(self::STATUS_ABORTED, $error);
+        if ($this->getStatus() === self::STATUS_QUEUED) {
+            $this->process->abort($error);
             $this->deferredStart->reject($error);
             return;
-        } else {
-            return;
         }
-        
-        $this->doExit(self::STATUS_ABORTED, $error);
+
+        $this->process->abort($error, $signal);
     }
     
     /**
@@ -152,7 +113,7 @@ class FutureProcess
     public function wait($timeout = null)
     {
         if ($this->deferredStart) {
-            $this->blocker->awaitOne($this->deferredStart->promise(), $timeout);
+            $this->blocker->awaitOne($this->promise, $timeout);
         }
         
         return $this;
@@ -175,102 +136,24 @@ class FutureProcess
     {
         return $this->promise->then($onFulfilled, $onError);
     }
-    
-    private function refreshStatus()
-    {
-        if (false === $status = proc_get_status($this->resource)) {
-            $this->doExit(self::STATUS_ERROR, new \RuntimeException('An unknown error occurred.'));
-        } elseif (!$status['running']) {
-            $exitCode = (-1 == $status['exitcode'] ? null : $status['exitcode']);
-            $this->doExit(self::STATUS_EXITED, $exitCode);
-        }
-        
-        return $status;
-    }
-    
-    private function getInitTimerFn()
-    {
-        if (!$this->options['timeout']) {
-            return function () {};
-        }
 
-        $options = $this->options;
-        $eventLoop = $this->eventLoop;
+    private function startDeferred()
+    {
+        $process = $this->process;
         $that = $this;
-        $futureExitCode = $this->futureExitCode;
 
-        return function () use ($options, $eventLoop, $that, $futureExitCode) {
-            $timer = $eventLoop->addTimer($options['timeout'], function () use ($that, $options) {
-                $that->abort($options['timeout_error'], $options['timeout_signal']);
-            });
-            $futureExitCode->promise()->then(array($timer, 'cancel'), array($timer, 'cancel'));
-        };
-    }
-    
-    private static function prepareOptions(array $options)
-    {
-        return array_merge(
-            self::getDefaultOptions(),
-            $options
-        );
-    }
-    
-    private static function getDefaultOptions()
-    {
-        if (is_null(self::$defaultOptions)) {
-            self::$defaultOptions = array(
-                'io' => array(
-                    0 => array('pipe', 'r'),
-                    1 => array('pipe', 'w'),
-                    2 => array('pipe', 'w'),
-                ),
-                'working_dir' => null,
-                'environment' => null,
-                'timeout' => null,
-                'timeout_signal' => 15,
-                'timeout_error' => new \RuntimeException('The process exceeded its time limit and was aborted.'),
-            );
-        }
-        
-        return self::$defaultOptions;
-    }
-    
-    private function getStartFn()
-    {
-        $procResource = &$this->resource;
-        $pipes = $this->pipes;
-        $status = &$this->status;
-        $pid = &$this->pid;
-        $initTimer = $this->getInitTimerFn();
-
-        return function ($command, array $options) use (&$procResource, $pipes, &$status, &$pid, $initTimer) {
-            $procResource = proc_open(
-                $command,
-                $options['io'],
-                $pipeResources,
-                $options['working_dir'],
-                $options['environment']
-            );
-            $pipes->setResources($pipeResources);
-            $status = FutureProcess::STATUS_RUNNING;
-            if (false === $procStatus = proc_get_status($procResource)) {
-                throw new \RuntimeException('Failed to start process.');
+        return $this->deferredStart->promise()->then(
+            function () use ($process, $that) {
+                $process->start();
+                return $that;
+            },
+            function ($reason) use ($that) {
+                $that->abort($reason);
+                if ($reason instanceof \Exception) {
+                    throw $reason;
+                }
+                return $that;
             }
-            $pid = $procStatus['pid'];
-            $initTimer();
-        };
-    }
-    
-    private function doExit($status, $exitCodeOrException)
-    {
-        $this->status = $status;
-        
-        $this->pipes->close();
-        
-        if ($exitCodeOrException instanceof \Exception) {
-            $this->futureExitCode->reject($exitCodeOrException);
-        } else {
-            $this->futureExitCode->resolve($exitCodeOrException);
-        }
+        );
     }
 }

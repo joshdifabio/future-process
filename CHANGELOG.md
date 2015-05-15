@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ### Changed
 - `getPipe` now returns instance of `React\Stream\Stream`.
 - Replace `FutureResult::readFromBuffer()` with `getOutput()`.
+- Move some functionality from `FutureProcess` to new `Process` class.
 
 ### Removed
 - Unused `$onProgress` param from `then()` methods.
