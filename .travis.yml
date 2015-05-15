@@ -21,4 +21,4 @@ script: php vendor/bin/phpunit --coverage-clover build/logs/clover.xml
 cache:
   directories: vendor
 
-after_success: if [[ $TRAVIS_PHP_VERSION = "5.3" ]]; then bash <(curl -s https://codecov.io/bash); fi;
+after_success: bash <(curl -s https://codecov.io/bash)
