@@ -45,6 +45,24 @@ class Pipes
         $this->resources = $resources;
     }
     
+    public function setResources2(array $resources)
+    {
+        foreach (self::$modesByType as $type => $modes) {
+            $this->resourcesByType[$type] = array_intersect_key($resources, $this->buffers[$type]);
+        }
+        
+        $this->resources = $resources;
+    }
+    
+    public function setResources3(array $resources)
+    {
+        foreach (self::$modesByType as $type => $modes) {
+            $this->resourcesByType[$type] = array_intersect_key($resources, $this->buffers[$type]);
+        }
+        
+        $this->resources = $resources;
+    }
+    
     public function getResource($descriptor)
     {
         if (!isset($this->resources[$descriptor])) {
